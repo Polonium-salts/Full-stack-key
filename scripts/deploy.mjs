@@ -314,6 +314,7 @@ log('部署到 Cloudflare Pages...');
 const deployed = wranglerInherit([
   'pages',
   'deploy',
+  '.next',
   '--branch=main',
   '--commit-dirty=true',
 ]);
