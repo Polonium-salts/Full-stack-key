@@ -246,61 +246,31 @@ if (BIND_ONLY) {
   process.exit(0);
 }
 
-/* ---------- 6. 确保 Pages 项目存在 ---------- */
+/* ---------- 6. 确保 SESSION_SECRET ---------- */
 
-function projectListContains(name) {
-  const res = wrangler(['pages', 'project', 'list']);
-  if (!res.ok) return false;
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`["│]\\s*${escaped}\\s*["│]`).test(res.out);
-}
-
-if (projectListContains(projectName)) {
-  log(`Pages 项目 "${projectName}" 已存在`);
-} else {
-  log(`创建 Pages 项目 "${projectName}"...`);
-  const created = wranglerInherit([
-    'pages',
-    'project',
-    'create',
-    projectName,
-    '--production-branch=main',
-  ]);
-  if (!created.ok && !projectListContains(projectName)) {
-    die(`创建 Pages 项目失败，请手动执行:\n  npx wrangler pages project create ${projectName} --production-branch=main`);
-  }
-}
-
-/* ---------- 7. 确保 SESSION_SECRET ---------- */
-
-const secretList = wrangler([
-  'pages',
-  'secret',
-  'list',
-  `--project-name=${projectName}`,
-]);
+const secretList = wrangler(['secret', 'list']);
 
 if (secretList.ok && /SESSION_SECRET/.test(secretList.out)) {
   log('SESSION_SECRET 已存在，跳过');
 } else {
   const secret = randomBytes(32).toString('hex');
-  log('生成并写入 SESSION_SECRET...');
-  const put = wrangler(
-    ['pages', 'secret', 'put', 'SESSION_SECRET', `--project-name=${projectName}`],
-    { input: `${secret}\n` }
-  );
-  if (!put.ok) {
-    die(`写入 SESSION_SECRET 失败，请手动执行:\n  npx wrangler pages secret put SESSION_SECRET --project-name=${projectName}`);
+  log('生成并写入 Worker SESSION_SECRET...');
+  const put = wrangler(['secret', 'put', 'SESSION_SECRET'], {
+    input: `${secret}\n`,
+  });
+  if (put.ok) {
+    log('SESSION_SECRET 写入成功（随机 32 字节 hex）');
+  } else {
+    log('提示: SESSION_SECRET 写入跳过（可后续通过 npx wrangler secret put SESSION_SECRET 设置）');
   }
-  log('SESSION_SECRET 写入成功（随机 32 字节 hex）');
 }
 
-/* ---------- 8. 构建 ---------- */
+/* ---------- 7. 构建 Cloudflare Worker ---------- */
 
 if (!SKIP_BUILD) {
-  log('开始构建（npm run build）...');
+  log('开始构建 Cloudflare Worker（npx opennextjs-cloudflare build）...');
   try {
-    execSync('npm run build', { stdio: 'inherit' });
+    execSync('npx opennextjs-cloudflare build', { stdio: 'inherit' });
   } catch {
     die('构建失败');
   }
@@ -308,24 +278,18 @@ if (!SKIP_BUILD) {
   log('跳过构建（--skip-build）');
 }
 
-/* ---------- 9. 部署 ---------- */
+/* ---------- 8. 部署到 Cloudflare Workers ---------- */
 
-log('部署到 Cloudflare Pages...');
-const deployed = wranglerInherit([
-  'pages',
-  'deploy',
-  '.next',
-  '--branch=main',
-  '--commit-dirty=true',
-]);
+log('部署到 Cloudflare Workers...');
+const deployed = wranglerInherit(['deploy']);
 if (!deployed.ok) die('部署失败');
 
 console.log(`
 ==============================================================
-\x1b[32m ✓ 部署完成！\x1b[0m
+\x1b[32m ✓ Cloudflare Worker 部署完成！\x1b[0m
 
- 生产地址:  https://${projectName}.pages.dev
- KV 绑定:   ${kvBinding} (${kvNamespaceId})
+ Worker 名称: ${projectName}
+ KV 绑定:     ${kvBinding} (${kvNamespaceId})
 
  首次访问会跳转到 /login → "设置主密码" 即可开始使用。
 ==============================================================

@@ -8,33 +8,33 @@ if (!existsSync(binPath)) {
 try {
   let content = readFileSync(binPath, 'utf8');
 
-  const injection = `
-	let userArgs = process.argv.slice(2);
-	if (userArgs[0] === 'deploy') {
+  // 确保恢复原始的参数传递
+  content = content.replace(/\.\.\.userArgs,/g, '...process.argv.slice(2),');
+
+  // 清除任何旧的 patch 内容
+  const fnIndex = content.indexOf('function runWrangler() {');
+  if (fnIndex !== -1) {
+    const semiverIndex = content.indexOf('if (semiver(process.versions.node');
+    if (semiverIndex !== -1 && semiverIndex > fnIndex) {
+      const before = content.slice(0, fnIndex + 'function runWrangler() {\n'.length);
+      const after = content.slice(semiverIndex);
+
+      const workerShim = `	if (process.argv.slice(2)[0] === 'deploy') {
 		const { execSync } = require('child_process');
 		const fs = require('fs');
-		console.log('\\x1b[36m[wrangler-compat]\\x1b[0m 检测到 Pages 项目正在执行 deploy 命令...');
-		if (!fs.existsSync('.next')) {
-			console.log('\\x1b[36m[wrangler-compat]\\x1b[0m 正在自动触发 Next.js 生产构建 (npm run build)...');
-			execSync('npm run build', { stdio: 'inherit' });
+		console.log('\\x1b[36m[wrangler-worker]\\x1b[0m 正在准备部署 Cloudflare Worker...');
+		if (!fs.existsSync('.open-next/worker.js')) {
+			console.log('\\x1b[36m[wrangler-worker]\\x1b[0m 自动执行 Worker 构建 (npx opennextjs-cloudflare build)...');
+			execSync('npx opennextjs-cloudflare build', { stdio: 'inherit' });
 		}
-		console.log('\\x1b[36m[wrangler-compat]\\x1b[0m 正在自动转为执行: wrangler pages deploy .next ...');
-		userArgs = ['pages', 'deploy', '.next', ...userArgs.slice(1)];
-	}
-`;
+	}\n\n`;
 
-  if (!content.includes('[wrangler-compat]')) {
-    content = content.replace(
-      /(\.\.\.process\.argv\.slice\(2\),)/,
-      `...userArgs,`
-    );
-    content = content.replace(
-      /(function runWrangler\(\) \{)/,
-      `$1${injection}`
-    );
-    writeFileSync(binPath, content, 'utf8');
-    console.log('[patch-wrangler] Successfully configured Cloudflare CI compatibility shim.');
+      content = before + workerShim + '\t' + after;
+    }
   }
+
+  writeFileSync(binPath, content, 'utf8');
+  console.log('[patch-wrangler] Successfully configured Cloudflare Worker deploy hook.');
 } catch (err) {
-  console.warn('[patch-wrangler] Note: Could not patch wrangler, skipping:', err.message);
+  console.warn('[patch-wrangler] Skipping wrangler patch:', err.message);
 }
