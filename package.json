@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "deploy": "next build && wrangler pages deploy .next",
+    "postinstall": "node scripts/patch-wrangler.mjs",
     "cf:bind-kv": "node scripts/deploy.mjs --bind-only",
     "cf:deploy": "node scripts/deploy.mjs",
     "cf:deploy:skip-build": "node scripts/deploy.mjs --skip-build"
