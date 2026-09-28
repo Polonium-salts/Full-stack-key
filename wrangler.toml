@@ -1,4 +1,4 @@
-name = "password-manager"
+name = "full-stack-key"
 main = ".open-next/worker.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
@@ -17,8 +17,7 @@ KV_MAIN_BINDING = "PASSWORD_MANAGER_KV"
 RATE_LIMIT_AUTH_PER_MINUTE = "10"
 RATE_LIMIT_API_PER_MINUTE = "600"
 
-# KV 命名空间：只需填写 binding 名称。
-# id 无需手动填写 —— 运行 `npm run cf:bind-kv` 或 `npm run cf:deploy` 会自动创建/查询命名空间并自动回写真实的 id。
+# KV 命名空间：自动由脚本在部署时匹配/创建并填入真实 ID
 [[kv_namespaces]]
 binding = "PASSWORD_MANAGER_KV"
 id = "00000000000000000000000000000000"
