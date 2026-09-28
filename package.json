@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "cf:bind-kv": "node scripts/deploy.mjs --bind-only",
     "cf:deploy": "node scripts/deploy.mjs",
     "cf:deploy:skip-build": "node scripts/deploy.mjs --skip-build"
   },

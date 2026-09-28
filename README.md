@@ -248,6 +248,7 @@ npm run dev                  # Next.js 开发服务器（MemoryKV）
 npm run build                # Next.js 生产构建
 npm run start                # Next.js 生产启动（Node）
 npm run lint                 # ESLint 检查
+npm run cf:bind-kv           # 自动绑定/创建 KV 空间并将真实 ID 回写到 wrangler.toml（无需手动填写 id）
 npm run cf:deploy            # 一键部署到 Cloudflare Pages（自动创建 KV / 项目 / Secret）
 npm run cf:deploy:skip-build # 跳过构建，直接部署已有 .next 产物
 ```
