@@ -24,8 +24,8 @@ try {
 		const fs = require('fs');
 		console.log('\\x1b[36m[wrangler-worker]\\x1b[0m 正在准备部署 Cloudflare Worker...');
 		if (!fs.existsSync('.open-next/worker.js')) {
-			console.log('\\x1b[36m[wrangler-worker]\\x1b[0m 自动执行 Worker 构建 (npx opennextjs-cloudflare build)...');
-			execSync('npx opennextjs-cloudflare build', { stdio: 'inherit' });
+			console.log('\\x1b[36m[wrangler-worker]\\x1b[0m 自动执行 Worker 构建 (npm run build:worker)...');
+			execSync('npm run build:worker', { stdio: 'inherit' });
 		}
 	}\n\n`;
 
