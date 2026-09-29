@@ -276,4 +276,95 @@ export class SQLiteKVStorage implements KVStorage {
 
     return { fileSizeBytes, rowCount, pageCount, pageSize };
   }
+
+  async getDetailedStats(): Promise<{
+    fileSizeBytes: number;
+    rowCount: number;
+    pageCount: number;
+    pageSize: number;
+    freePages: number;
+    journalMode: string;
+    encoding: string;
+    columns: Array<{ name: string; type: string; notnull: number; pk: number }>;
+    rows: Array<{ key: string; length: number; expiresAt: number | null }>;
+  }> {
+    const db = await this.getDb();
+    let fileSizeBytes = 0;
+    try {
+      if (typeof fs !== 'undefined' && fs.existsSync(this.dbPath)) {
+        fileSizeBytes = fs.statSync(this.dbPath).size;
+      }
+    } catch {}
+
+    let rowCount = 0;
+    let pageCount = 0;
+    let pageSize = 4096;
+    let freePages = 0;
+    let journalMode = 'DELETE';
+    let encoding = 'UTF-8';
+
+    try {
+      const countRow = db.prepare('SELECT COUNT(*) as count FROM kv_store').get() as { count?: number | bigint } | undefined;
+      rowCount = Number(countRow?.count || 0);
+
+      const pragmaPageCount = db.prepare('PRAGMA page_count').get() as { page_count?: number | bigint } | undefined;
+      pageCount = Number(pragmaPageCount?.page_count || 0);
+
+      const pragmaPageSize = db.prepare('PRAGMA page_size').get() as { page_size?: number | bigint } | undefined;
+      pageSize = Number(pragmaPageSize?.page_size || 4096);
+
+      const pragmaFreePages = db.prepare('PRAGMA freelist_count').get() as { freelist_count?: number | bigint } | undefined;
+      freePages = Number(pragmaFreePages?.freelist_count || 0);
+
+      const pragmaJournal = db.prepare('PRAGMA journal_mode').get() as { journal_mode?: string } | undefined;
+      journalMode = (pragmaJournal?.journal_mode || 'DELETE').toUpperCase();
+
+      const pragmaEncoding = db.prepare('PRAGMA encoding').get() as { encoding?: string } | undefined;
+      encoding = pragmaEncoding?.encoding || 'UTF-8';
+
+      if (!fileSizeBytes && pageCount && pageSize) {
+        fileSizeBytes = pageCount * pageSize;
+      }
+    } catch {}
+
+    let columns: Array<{ name: string; type: string; notnull: number; pk: number }> = [];
+    try {
+      const tableInfo = db.prepare('PRAGMA table_info(kv_store)').all() as Array<{
+        cid: number;
+        name: string;
+        type: string;
+        notnull: number;
+        dflt_value: unknown;
+        pk: number;
+      }>;
+      columns = tableInfo.map((c) => ({
+        name: c.name,
+        type: c.type,
+        notnull: c.notnull,
+        pk: c.pk,
+      }));
+    } catch {}
+
+    let rows: Array<{ key: string; length: number; expiresAt: number | null }> = [];
+    try {
+      const sample = db.prepare('SELECT key, length(value) as length, expires_at as expiresAt FROM kv_store ORDER BY key ASC').all() as Array<{
+        key: string;
+        length: number;
+        expiresAt: number | null;
+      }>;
+      rows = sample;
+    } catch {}
+
+    return {
+      fileSizeBytes,
+      rowCount,
+      pageCount,
+      pageSize,
+      freePages,
+      journalMode,
+      encoding,
+      columns,
+      rows,
+    };
+  }
 }

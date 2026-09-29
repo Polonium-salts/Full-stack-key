@@ -90,6 +90,25 @@ export class MemoryKVStorage implements KVStorage {
       estimatedBytes: bytes,
     };
   }
+
+  getDetailedStats(): {
+    keysCount: number;
+    estimatedBytes: number;
+    entries: Array<{ key: string; length: number; expiresAt?: number }>;
+  } {
+    let bytes = 0;
+    const entries: Array<{ key: string; length: number; expiresAt?: number }> = [];
+    for (const [key, entry] of this.store.entries()) {
+      const valLen = entry.value?.length || 0;
+      bytes += key.length * 2 + valLen * 2;
+      entries.push({ key, length: valLen, expiresAt: entry.expiresAt });
+    }
+    return {
+      keysCount: this.store.size,
+      estimatedBytes: bytes,
+      entries,
+    };
+  }
 }
 
 export const memoryKV = new MemoryKVStorage();

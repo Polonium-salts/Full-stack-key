@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   BookOpen,
+  Database,
   Folder,
   FolderTree,
   KeyRound,
@@ -23,6 +24,7 @@ import type { Category, Tag } from '@/lib/types';
 const navItems = [
   { href: '/dashboard', label: '全部密码', icon: KeyRound },
   { href: '/dashboard/categories', label: '分类与标签', icon: FolderTree },
+  { href: '/dashboard/database', label: '数据库监控', icon: Database },
   { href: '/dashboard/settings', label: '设置', icon: Settings2 },
   { href: '/docs', label: 'API 文档', icon: BookOpen },
 ];

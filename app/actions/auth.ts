@@ -509,3 +509,250 @@ export async function getDataMetricsAction(): Promise<DataMetrics> {
     },
   };
 }
+
+export interface DatabaseTablePartition {
+  id: string;
+  name: string;
+  type: 'physical' | 'logical';
+  description: string;
+  recordCount: number;
+  sizeFormatted: string;
+  keyPattern: string;
+  columns?: Array<{
+    name: string;
+    type: string;
+    primaryKey?: boolean;
+    nullable?: boolean;
+  }>;
+  sampleKeys: string[];
+}
+
+export interface DatabaseDetails {
+  driver: 'sqlite' | 'cloudflare' | 'memory';
+  driverName: string;
+  environment: string;
+  environmentName: string;
+  isPersistent: boolean;
+  status: 'healthy' | 'warning' | 'degraded';
+  description: string;
+  dbPath?: string;
+  bindingName?: string;
+  fallbackReason?: string;
+  capacity: {
+    fileSizeBytes: number;
+    fileSizeFormatted: string;
+    totalKeys: number;
+    estimatedPayloadBytes: number;
+    estimatedPayloadFormatted: string;
+    pageSize?: number;
+    pageCount?: number;
+    freePages?: number;
+    journalMode?: string;
+    encoding?: string;
+  };
+  tables: DatabaseTablePartition[];
+}
+
+export async function getDatabaseDetailsAction(): Promise<DatabaseDetails> {
+  const ctx = await getServerContext();
+  const { getStorageInfo, getDetailedDatabaseStats } = await import('@/lib/storage');
+
+  const [info, detailed, allPasswords, categories, tags, apiKeysList] = await Promise.all([
+    getStorageInfo(),
+    getDetailedDatabaseStats(),
+    getAllPasswordEntries(ctx.ownerId),
+    getAllCategories(ctx.ownerId),
+    getAllTags(ctx.ownerId),
+    listApiKeys(),
+  ]);
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 2)} ${sizes[i]}`;
+  }
+
+  const driverNames = {
+    sqlite: 'SQLite 本地数据库',
+    cloudflare: 'Cloudflare KV 键值存储',
+    memory: 'MemoryKV 内存临时',
+  };
+
+  const envNames: Record<string, string> = {
+    node: 'Node.js 服务端',
+    cloudflare: 'Cloudflare Workers / Pages',
+    edge: 'Edge 边缘计算',
+    browser: '浏览器客户端',
+    unknown: '未知环境',
+  };
+
+  const entries = detailed.entries || [];
+
+  const passwordEntries = entries.filter((e) => e.key.includes(':passwords:') && !e.key.endsWith(':__index__'));
+  const passwordIndexEntries = entries.filter((e) => e.key.includes(':passwords:__index__'));
+  const categoryEntries = entries.filter((e) => e.key.includes(':categories:') && !e.key.endsWith(':__index__'));
+  const categoryIndexEntries = entries.filter((e) => e.key.includes(':categories:__index__'));
+  const tagEntries = entries.filter((e) => e.key.includes(':tags:') && !e.key.endsWith(':__index__'));
+  const tagIndexEntries = entries.filter((e) => e.key.includes(':tags:__index__'));
+  const configEntries = entries.filter((e) => e.key === 'pm:__config__');
+  const sessionEntries = entries.filter((e) => e.key.startsWith('pm:sessions:'));
+  const otherEntries = entries.filter(
+    (e) =>
+      !passwordEntries.includes(e) &&
+      !passwordIndexEntries.includes(e) &&
+      !categoryEntries.includes(e) &&
+      !categoryIndexEntries.includes(e) &&
+      !tagEntries.includes(e) &&
+      !tagIndexEntries.includes(e) &&
+      !configEntries.includes(e) &&
+      !sessionEntries.includes(e)
+  );
+
+  const sumBytes = (items: Array<{ length: number }>) => items.reduce((acc, curr) => acc + (curr.length || 0), 0);
+
+  const tables: DatabaseTablePartition[] = [];
+
+  // 1. Physical Table (if SQLite)
+  if (info.driver === 'sqlite' || detailed.columns?.length) {
+    tables.push({
+      id: 'kv_store',
+      name: '物理存储主表 (kv_store)',
+      type: 'physical',
+      description: '底层键值持久化表，采用复合键值对与 TTL 过期索引管理全部加密数据',
+      recordCount: detailed.totalKeys,
+      sizeFormatted: formatBytes(detailed.fileSizeBytes),
+      keyPattern: 'TEXT PRIMARY KEY',
+      columns: detailed.columns.map((c) => ({
+        name: c.name,
+        type: c.type,
+        primaryKey: Boolean(c.pk),
+        nullable: !c.notnull,
+      })),
+      sampleKeys: entries.slice(0, 5).map((e) => e.key),
+    });
+  }
+
+  // 2. Passwords Partition
+  tables.push({
+    id: 'passwords',
+    name: '密码数据分区 (passwords)',
+    type: 'logical',
+    description: '存放已加密的单项密码凭证、AES-GCM 初始化向量 (IV) 与验证标签 (TAG)',
+    recordCount: allPasswords.length || passwordEntries.length,
+    sizeFormatted: formatBytes(sumBytes(passwordEntries) || allPasswords.length * 512),
+    keyPattern: `pm:${ctx.ownerId}:passwords:<id>`,
+    sampleKeys: passwordEntries.slice(0, 5).map((e) => e.key),
+  });
+
+  // 3. Password Index Partition
+  tables.push({
+    id: 'passwords_index',
+    name: '密码索引分区 (passwords_index)',
+    type: 'logical',
+    description: '维护所有密码条目的全局 ID 索引列表与物理检索指针',
+    recordCount: passwordIndexEntries.length || 1,
+    sizeFormatted: formatBytes(sumBytes(passwordIndexEntries) || 128),
+    keyPattern: `pm:${ctx.ownerId}:passwords:__index__`,
+    sampleKeys: passwordIndexEntries.map((e) => e.key),
+  });
+
+  // 4. Categories Partition
+  tables.push({
+    id: 'categories',
+    name: '分类数据分区 (categories)',
+    type: 'logical',
+    description: '存放所有自定义密码分类元数据及排序索引',
+    recordCount: categories.length || categoryEntries.length,
+    sizeFormatted: formatBytes(sumBytes(categoryEntries) + sumBytes(categoryIndexEntries) || categories.length * 128),
+    keyPattern: `pm:${ctx.ownerId}:categories:<id>`,
+    sampleKeys: categoryEntries.slice(0, 5).map((e) => e.key),
+  });
+
+  // 5. Tags Partition
+  tables.push({
+    id: 'tags',
+    name: '标签数据分区 (tags)',
+    type: 'logical',
+    description: '存放自定义彩色标签与色彩映射元数据',
+    recordCount: tags.length || tagEntries.length,
+    sizeFormatted: formatBytes(sumBytes(tagEntries) + sumBytes(tagIndexEntries) || tags.length * 128),
+    keyPattern: `pm:${ctx.ownerId}:tags:<id>`,
+    sampleKeys: tagEntries.slice(0, 5).map((e) => e.key),
+  });
+
+  // 6. Security Config Partition
+  tables.push({
+    id: 'config',
+    name: '系统安全配置表 (config)',
+    type: 'logical',
+    description: '存放主密码 PBKDF2 哈希、KDF 盐值、加密轮数及 API 密钥授权清单',
+    recordCount: configEntries.length || (apiKeysList.length ? 1 : 0),
+    sizeFormatted: formatBytes(sumBytes(configEntries) || 512),
+    keyPattern: 'pm:__config__',
+    sampleKeys: configEntries.map((e) => e.key),
+  });
+
+  // 7. Sessions Partition
+  if (sessionEntries.length > 0) {
+    tables.push({
+      id: 'sessions',
+      name: '用户认证会话表 (sessions)',
+      type: 'logical',
+      description: '活跃登录会话令牌与过期时间管理',
+      recordCount: sessionEntries.length,
+      sizeFormatted: formatBytes(sumBytes(sessionEntries)),
+      keyPattern: 'pm:sessions:<sessionToken>',
+      sampleKeys: sessionEntries.slice(0, 5).map((e) => e.key),
+    });
+  }
+
+  // 8. Other Partitions
+  if (otherEntries.length > 0) {
+    tables.push({
+      id: 'other',
+      name: '其他系统键值 (misc)',
+      type: 'logical',
+      description: '系统杂项与扩展存储数据条目',
+      recordCount: otherEntries.length,
+      sizeFormatted: formatBytes(sumBytes(otherEntries)),
+      keyPattern: 'pm:*',
+      sampleKeys: otherEntries.slice(0, 5).map((e) => e.key),
+    });
+  }
+
+  const payloadStr = JSON.stringify({
+    passwords: allPasswords,
+    categories,
+    tags,
+  });
+  const payloadBytes = Buffer.byteLength(payloadStr, 'utf8');
+  const fileSizeBytes = detailed.fileSizeBytes || payloadBytes;
+
+  return {
+    driver: info.driver,
+    driverName: driverNames[info.driver] || info.driver,
+    environment: info.environment,
+    environmentName: envNames[info.environment] || info.environment,
+    isPersistent: info.isPersistent,
+    status: info.isPersistent ? 'healthy' : 'warning',
+    description: info.details.description,
+    dbPath: info.details.dbPath,
+    bindingName: info.details.bindingName,
+    fallbackReason: info.details.fallbackReason,
+    capacity: {
+      fileSizeBytes,
+      fileSizeFormatted: formatBytes(fileSizeBytes),
+      totalKeys: detailed.totalKeys || entries.length,
+      estimatedPayloadBytes: payloadBytes,
+      estimatedPayloadFormatted: formatBytes(payloadBytes),
+      pageSize: detailed.pageSize,
+      pageCount: detailed.pageCount,
+      freePages: detailed.freePages,
+      journalMode: detailed.journalMode,
+      encoding: detailed.encoding,
+    },
+    tables,
+  };
+}

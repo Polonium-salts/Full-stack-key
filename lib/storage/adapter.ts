@@ -298,6 +298,74 @@ export class StorageAdapterManager {
     };
   }
 
+  public async getDetailedDatabaseStats(optionsOrBinding?: string | KVStorageOptions): Promise<{
+    fileSizeBytes: number;
+    totalKeys: number;
+    pageSize?: number;
+    pageCount?: number;
+    freePages?: number;
+    journalMode?: string;
+    encoding?: string;
+    columns: Array<{ name: string; type: string; notnull: number; pk: number }>;
+    entries: Array<{ key: string; length: number; expiresAt?: number | null }>;
+  }> {
+    const storage = this.getStorage(optionsOrBinding);
+    const info = this.getStorageInfo(optionsOrBinding);
+
+    if (info.driver === 'sqlite' && storage instanceof SQLiteKVStorage) {
+      try {
+        const stats = await storage.getDetailedStats();
+        return {
+          fileSizeBytes: stats.fileSizeBytes,
+          totalKeys: stats.rowCount,
+          pageSize: stats.pageSize,
+          pageCount: stats.pageCount,
+          freePages: stats.freePages,
+          journalMode: stats.journalMode,
+          encoding: stats.encoding,
+          columns: stats.columns,
+          entries: stats.rows,
+        };
+      } catch {}
+    }
+
+    if (info.driver === 'memory') {
+      try {
+        const stats = memoryKV.getDetailedStats();
+        return {
+          fileSizeBytes: stats.estimatedBytes,
+          totalKeys: stats.keysCount,
+          columns: [
+            { name: 'key', type: 'TEXT', notnull: 1, pk: 1 },
+            { name: 'value', type: 'TEXT', notnull: 1, pk: 0 },
+            { name: 'expiresAt', type: 'INTEGER', notnull: 0, pk: 0 },
+          ],
+          entries: stats.entries,
+        };
+      } catch {}
+    }
+
+    try {
+      const listRes = await storage.list();
+      return {
+        fileSizeBytes: 0,
+        totalKeys: listRes.keys.length,
+        columns: [
+          { name: 'key', type: 'TEXT', notnull: 1, pk: 1 },
+          { name: 'value', type: 'TEXT', notnull: 1, pk: 0 },
+        ],
+        entries: listRes.keys.map((k) => ({ key: k, length: 0 })),
+      };
+    } catch {
+      return {
+        fileSizeBytes: 0,
+        totalKeys: 0,
+        columns: [],
+        entries: [],
+      };
+    }
+  }
+
   public reset(): void {
     if (this.storageInstance && 'close' in this.storageInstance && typeof (this.storageInstance as { close?: () => void }).close === 'function') {
       try {

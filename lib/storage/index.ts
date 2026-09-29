@@ -17,6 +17,10 @@ export function getStorageStats(bindingNameOrOptions?: string | KVStorageOptions
   return storageAdapterManager.getStorageStats(bindingNameOrOptions);
 }
 
+export function getDetailedDatabaseStats(bindingNameOrOptions?: string | KVStorageOptions) {
+  return storageAdapterManager.getDetailedDatabaseStats(bindingNameOrOptions);
+}
+
 export function resetStorageForTesting(): void {
   storageAdapterManager.reset();
 }
