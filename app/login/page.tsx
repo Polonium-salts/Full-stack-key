@@ -15,19 +15,59 @@ export const dynamic = 'force-dynamic';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [initialized, setInitialized] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'login' | 'init'>('login');
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (initialized !== null) return;
-    getInitStatus().then((s) => {
-      setInitialized(s.initialized);
-      setMode(s.initialized ? 'login' : 'init');
-    });
-  }, [initialized]);
+    let mounted = true;
+    async function checkInit() {
+      try {
+        const s = await getInitStatus();
+        if (mounted && s && typeof s.initialized === 'boolean') {
+          setMode(s.initialized ? 'login' : 'init');
+          return;
+        }
+      } catch (err) {
+        console.warn('getInitStatus action failed, trying /api/auth/init fallback:', err);
+      }
+
+      try {
+        const res = await fetch('/api/auth/init');
+        if (res.ok) {
+          const data = await res.json();
+          if (mounted && typeof data.initialized === 'boolean') {
+            setMode(data.initialized ? 'login' : 'init');
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to query /api/auth/init:', err);
+      }
+    }
+
+    checkInit();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function formatErrorMessage(msg?: string): string {
+    if (!msg) return '操作失败，请重试';
+    if (msg.includes('Master password is incorrect') || msg.includes('AUTH_INVALID_PASSWORD')) {
+      return '主密码错误，请重新输入';
+    }
+    if (msg.includes('Application is not initialized') || msg.includes('AUTH_NOT_INITIALIZED')) {
+      return '密码保险库尚未创建，请先创建主密码';
+    }
+    if (msg.includes('at least 8 characters')) {
+      return '主密码长度至少为 8 位';
+    }
+    if (msg.includes('Passwords do not match')) {
+      return '两次输入的密码不一致';
+    }
+    return msg;
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -39,7 +79,7 @@ export default function LoginPage() {
       if (mode === 'init') {
         const res = await initAppAction(formData);
         if (!res.ok) {
-          setError(res.error || '初始化失败');
+          setError(formatErrorMessage(res.error));
         } else {
           toast.success('保险库已创建');
           router.push('/dashboard');
@@ -47,11 +87,18 @@ export default function LoginPage() {
       } else {
         const res = await loginAction(formData);
         if (!res.ok) {
-          setError(res.error || '登录失败');
+          if (res.error?.includes('not initialized') || res.error?.includes('AUTH_NOT_INITIALIZED')) {
+            setMode('init');
+            setError('密码保险库尚未创建，请先创建主密码');
+          } else {
+            setError(formatErrorMessage(res.error));
+          }
         } else {
           router.push('/dashboard');
         }
       }
+    } catch (err) {
+      setError(err instanceof Error ? formatErrorMessage(err.message) : '提交失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -132,14 +179,14 @@ export default function LoginPage() {
 
           <Button
             type="submit"
-            disabled={loading || initialized === null}
+            disabled={loading}
             className="h-11 w-full"
           >
             {loading && <Loader2 className="animate-spin" />}
             {loading ? '请稍候...' : isInit ? '创建保险库' : '解锁'}
           </Button>
 
-          {!isInit && initialized && (
+          {!isInit && (
             <p className="flex items-center justify-center gap-1.5 pt-1 text-xs text-muted-foreground">
               <ShieldCheck className="size-3.5" />
               会话已通过加密 Cookie 保护

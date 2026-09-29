@@ -120,13 +120,13 @@ const endpoints: Endpoint[] = [
   {
     method: 'GET',
     path: '/api/categories',
-    description: '列出全部分类',
+    description: '列出全部分类（含 usageCount 使用计数）',
     auth: 'API 密钥 + 主密码',
   },
   {
     method: 'POST',
     path: '/api/categories',
-    description: '创建分类：{ "name": "Work" }',
+    description: '创建分类（幂等）：{ "name": "Work" }。同名分类已存在时直接返回现有分类。',
     auth: 'API 密钥 + 主密码',
   },
   {
@@ -138,7 +138,7 @@ const endpoints: Endpoint[] = [
   {
     method: 'GET/POST',
     path: '/api/tags',
-    description: '列出或创建标签：{ "name": "2fa", "color": "#22c55e" }',
+    description: '列出标签（含 usageCount）或创建标签（幂等）：{ "name": "2fa", "color": "#22c55e" }。同名标签已存在时直接返回现有标签。',
     auth: 'API 密钥 + 主密码',
   },
   {
@@ -156,9 +156,9 @@ const endpoints: Endpoint[] = [
   {
     method: 'POST',
     path: '/api/data/import',
-    description: '导入备份。冲突策略：skip | overwrite | duplicate。',
+    description: '导入备份（含分类与标签，按名称去重并自动重映射引用）。冲突策略：skip | overwrite | duplicate。',
     auth: 'API 密钥 + 主密码',
-    body: `{ "strategy": "skip", "data": { "version": "1.0.0", "passwords": [...], ... } }`,
+    body: `{ "strategy": "skip", "data": { "version": "1.0.0", "categories": [...], "tags": [...], "passwords": [...], ... } }`,
   },
   {
     method: 'GET/POST',

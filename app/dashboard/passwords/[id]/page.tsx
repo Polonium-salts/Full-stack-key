@@ -366,15 +366,17 @@ export default function PasswordDetailPage({ params }: { params: Promise<{ id: s
                 ) : (
                   entry.tags.map((tid) => {
                     const t = tags.find((x) => x.id === tid);
-                    return t ? (
+                    // 已删除/未知标签的兑底显示
+                    return (
                       <Badge
-                        key={t.id}
+                        key={tid}
                         variant="outline"
-                        style={t.color ? { borderColor: t.color, color: t.color } : undefined}
+                        style={t?.color ? { borderColor: t.color, color: t.color } : undefined}
+                        className={t ? '' : 'opacity-60'}
                       >
-                        #{t.name}
+                        #{t?.name ?? '未知标签'}
                       </Badge>
-                    ) : null;
+                    );
                   })
                 )}
               </div>

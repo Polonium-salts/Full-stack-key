@@ -19,10 +19,12 @@ import {
   createCategoryAction,
   updateCategoryAction,
   deleteCategoryAction,
+  getCategoryCountsAction,
   listTagsAction,
   createTagAction,
   updateTagAction,
   deleteTagAction,
+  getTagCountsAction,
 } from '@/app/actions/auth';
 import type { Category, Tag } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -84,6 +86,7 @@ function CategoriesAndTagsContent() {
 
   // Categories state
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -93,6 +96,7 @@ function CategoriesAndTagsContent() {
 
   // Tags state
   const [tags, setTags] = useState<Tag[]>([]);
+  const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
   const [loadingTags, setLoadingTags] = useState(true);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState('');
@@ -111,8 +115,12 @@ function CategoriesAndTagsContent() {
   async function loadCategories() {
     setLoadingCategories(true);
     try {
-      const data = await listCategoriesAction();
+      const [data, counts] = await Promise.all([
+        listCategoriesAction(),
+        getCategoryCountsAction(),
+      ]);
       setCategories(data);
+      setCategoryCounts(counts);
     } finally {
       setLoadingCategories(false);
     }
@@ -121,8 +129,12 @@ function CategoriesAndTagsContent() {
   async function loadTags() {
     setLoadingTags(true);
     try {
-      const data = await listTagsAction();
+      const [data, counts] = await Promise.all([
+        listTagsAction(),
+        getTagCountsAction(),
+      ]);
       setTags(data);
+      setTagCounts(counts);
     } finally {
       setLoadingTags(false);
     }
@@ -132,13 +144,17 @@ function CategoriesAndTagsContent() {
     let cancelled = false;
     (async () => {
       try {
-        const [cats, tgs] = await Promise.all([
+        const [cats, catCounts, tgs, tagCounts] = await Promise.all([
           listCategoriesAction(),
+          getCategoryCountsAction(),
           listTagsAction(),
+          getTagCountsAction(),
         ]);
         if (!cancelled) {
           setCategories(cats);
+          setCategoryCounts(catCounts);
           setTags(tgs);
+          setTagCounts(tagCounts);
         }
       } finally {
         if (!cancelled) {
@@ -178,7 +194,11 @@ function CategoriesAndTagsContent() {
     if (!editCategoryName.trim()) return;
     const fd = new FormData();
     fd.set('name', editCategoryName.trim());
-    await updateCategoryAction(id, fd);
+    const res = await updateCategoryAction(id, fd);
+    if (!res.ok) {
+      toast.error(res.error || '更新分类失败');
+      return;
+    }
     toast.success('分类已更新');
     setEditingCategoryId(null);
     loadCategories();
@@ -219,7 +239,11 @@ function CategoriesAndTagsContent() {
     const fd = new FormData();
     fd.set('name', editTagName.trim());
     if (editTagColor) fd.set('color', editTagColor);
-    await updateTagAction(id, fd);
+    const res = await updateTagAction(id, fd);
+    if (!res.ok) {
+      toast.error(res.error || '更新标签失败');
+      return;
+    }
     toast.success('标签已更新');
     setEditingTagId(null);
     loadTags();
@@ -321,7 +345,9 @@ function CategoriesAndTagsContent() {
                       <div className="min-w-0">
                         <div className="truncate font-medium">{cat.name}</div>
                         <div className="text-xs text-muted-foreground">
-                          {new Date(cat.updatedAt).toLocaleDateString()}
+                          {(categoryCounts[cat.id] ?? 0) > 0
+                            ? `${categoryCounts[cat.id]} 条密码`
+                            : '未使用'}
                         </div>
                       </div>
                     )}
@@ -456,7 +482,9 @@ function CategoriesAndTagsContent() {
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {new Date(t.createdAt).toLocaleDateString()}
+                          {(tagCounts[t.id] ?? 0) > 0
+                            ? `${tagCounts[t.id]} 条密码`
+                            : '未使用'}
                         </div>
                       </div>
                     )}

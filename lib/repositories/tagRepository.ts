@@ -1,15 +1,33 @@
 import { nanoid } from 'nanoid';
 import type { Tag } from '@/lib/types';
 import { getStorage } from '@/lib/storage';
-import { NotFoundError } from '@/lib/errors';
+import { NotFoundError, ConflictError } from '@/lib/errors';
 
 const KEY_PREFIXES = {
   TAG: (ownerId: string, id: string) => `pm:${ownerId}:tags:${id}`,
   TAGS_INDEX: (ownerId: string) => `pm:${ownerId}:tags:__index__`,
 } as const;
 
+export async function findTagByName(ownerId: string, name: string): Promise<Tag | null> {
+  const tags = await getAllTags(ownerId);
+  return tags.find((t) => t.name === name) ?? null;
+}
+
+/** 按名称查找标签，不存在时创建（可选颜色），供扩展端/导入复用 */
+export async function findOrCreateTag(ownerId: string, name: string, color?: string): Promise<Tag> {
+  const existing = await findTagByName(ownerId, name);
+  if (existing) return existing;
+  return createTag(ownerId, name, color);
+}
+
 export async function createTag(ownerId: string, name: string, color?: string): Promise<Tag> {
   const storage = getStorage();
+
+  const duplicate = await findTagByName(ownerId, name);
+  if (duplicate) {
+    throw new ConflictError(`标签「${name}」已存在`, 'TAG_DUPLICATE');
+  }
+
   const id = nanoid();
   const now = new Date().toISOString();
 
@@ -68,6 +86,13 @@ export async function updateTag(
   const storage = getStorage();
   const existing = await requireTagById(ownerId, id);
 
+  if (updates.name !== undefined) {
+    const duplicate = await findTagByName(ownerId, updates.name);
+    if (duplicate && duplicate.id !== id) {
+      throw new ConflictError(`标签「${updates.name}」已存在`, 'TAG_DUPLICATE');
+    }
+  }
+
   const updated: Tag = {
     ...existing,
     ...(updates.name !== undefined && { name: updates.name }),
@@ -107,4 +132,56 @@ export async function deleteTag(ownerId: string, id: string): Promise<void> {
 
 export async function exportTags(ownerId: string): Promise<Tag[]> {
   return getAllTags(ownerId);
+}
+
+export interface TagUsageCounts {
+  [tagId: string]: number;
+}
+
+/** 统计每个标签被多少条有效（非回收站）密码引用 */
+export async function getTagUsageCounts(ownerId: string): Promise<TagUsageCounts> {
+  const { getAllPasswordEntries } = await import('./passwordRepository');
+  const allPasswords = await getAllPasswordEntries(ownerId);
+
+  const counts: TagUsageCounts = {};
+  for (const pwd of allPasswords) {
+    if (pwd.trashed) continue;
+    for (const tid of pwd.tags) {
+      counts[tid] = (counts[tid] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+export interface ImportTagsResult {
+  created: number;
+  skipped: number;
+  idMap: Record<string, string>;
+}
+
+/**
+ * 导入标签：按名称去重（已存在同名的复用现有标签），保留颜色。
+ * 返回旧 id -> 现有/新 id 的映射，供密码条目重映射 tags。
+ */
+export async function importTags(ownerId: string, tags: Tag[]): Promise<ImportTagsResult> {
+  const result: ImportTagsResult = { created: 0, skipped: 0, idMap: {} };
+  const existing = await getAllTags(ownerId);
+  const existingByName = new Map(existing.map((t) => [t.name, t]));
+
+  for (const tag of tags) {
+    if (!tag || typeof tag.name !== 'string' || !tag.name.trim()) continue;
+    const name = tag.name.trim();
+    const existingTag = existingByName.get(name);
+    if (existingTag) {
+      result.skipped++;
+      result.idMap[tag.id] = existingTag.id;
+    } else {
+      const created = await createTag(ownerId, name, tag.color);
+      existingByName.set(name, created);
+      result.created++;
+      result.idMap[tag.id] = created.id;
+    }
+  }
+
+  return result;
 }

@@ -10,7 +10,49 @@ import type {
   PasswordEntryDecrypted,
 } from '@/lib/types';
 import { getStorage } from '@/lib/storage';
-import { NotFoundError, VersionConflictError } from '@/lib/errors';
+import { NotFoundError, VersionConflictError, ValidationError } from '@/lib/errors';
+
+/**
+ * 校验密码条目引用的分类与标签是否真实存在。
+ * 自由文本标签（历史上由旧版扩展写入）会被自动注册为正式标签并替换为标签 ID。
+ */
+async function resolveTagAndCategoryRefs(
+  ownerId: string,
+  refs: { categoryId?: string; tags?: string[] }
+): Promise<{ categoryId?: string; tags?: string[] }> {
+  const { findCategoryById } = await import('./categoryRepository');
+  const { findOrCreateTag } = await import('./tagRepository');
+
+  const categoryId = refs.categoryId;
+  if (categoryId) {
+    const category = await findCategoryById(ownerId, categoryId);
+    if (!category) {
+      throw new ValidationError(`分类 "${categoryId}" 不存在`, {
+        field: 'categoryId',
+      });
+    }
+  }
+
+  let tags = refs.tags;
+  if (tags && tags.length > 0) {
+    const { findTagById } = await import('./tagRepository');
+    const resolved: string[] = [];
+    for (const t of tags) {
+      if (!t || !t.trim()) continue;
+      // 已是有效标签 ID 则直接使用；否则视为自由名称，自动注册为新标签
+      const asId = await findTagById(ownerId, t);
+      if (asId) {
+        resolved.push(asId.id);
+      } else {
+        const tag = await findOrCreateTag(ownerId, t.trim());
+        resolved.push(tag.id);
+      }
+    }
+    tags = [...new Set(resolved)];
+  }
+
+  return { categoryId, tags };
+}
 
 export type { EncryptedPasswordEntry } from '@/lib/types';
 
@@ -67,6 +109,13 @@ export async function decryptEntry(
 
 export async function createPasswordEntry({ ownerId, entry, encryptFn }: CreateOptions): Promise<PasswordEntry> {
   const storage = getStorage();
+
+  // 校验分类存在性，并把自由文本标签注册为正式标签（返回标签 ID 列表）
+  const resolvedRefs = await resolveTagAndCategoryRefs(ownerId, {
+    categoryId: entry.categoryId,
+    tags: entry.tags,
+  });
+
   const id = nanoid();
   const now = new Date().toISOString();
 
@@ -87,8 +136,8 @@ export async function createPasswordEntry({ ownerId, entry, encryptFn }: CreateO
     encryptedNotes: notesEncrypted?.encrypted,
     notesIv: notesEncrypted?.iv,
     notesTag: notesEncrypted?.tag,
-    tags: entry.tags ?? [],
-    categoryId: entry.categoryId,
+    tags: resolvedRefs.tags ?? [],
+    categoryId: resolvedRefs.categoryId,
     createdAt: now,
     updatedAt: now,
     version: 1,
@@ -194,13 +243,20 @@ export async function updatePasswordEntry({
     throw new VersionConflictError({ expected: update.version, actual: existing.version });
   }
 
+  // 校验新的分类/标签引用（仅在本次提交中指定时）
+  const resolvedRefs = await resolveTagAndCategoryRefs(ownerId, {
+    categoryId: update.categoryId,
+    tags: update.tags,
+  });
+
   let result: PasswordEntry = {
     ...existing,
     site: update.site ?? existing.site,
     url: update.url !== undefined ? update.url : existing.url,
     username: update.username ?? existing.username,
-    tags: update.tags ?? existing.tags,
-    categoryId: update.categoryId !== undefined ? update.categoryId : existing.categoryId,
+    tags: resolvedRefs.tags ?? existing.tags,
+    categoryId:
+      update.categoryId !== undefined ? resolvedRefs.categoryId : existing.categoryId,
     updatedAt: new Date().toISOString(),
     version: existing.version + 1,
   };
@@ -394,6 +450,8 @@ export interface ImportResult {
   skipped: number;
   overwritten: number;
   duplicated: number;
+  categoriesCreated: number;
+  tagsCreated: number;
   errors: Array<{ id: string; message: string }>;
 }
 
@@ -407,10 +465,19 @@ export async function importPasswords(
     skipped: 0,
     overwritten: 0,
     duplicated: 0,
+    categoriesCreated: 0,
+    tagsCreated: 0,
     errors: [],
   };
 
   const storage = getStorage();
+
+  // 1. 先导入分类与标签（按名称去重），得到旧 id -> 新 id 的映射
+  const { importCategories } = await import('./categoryRepository');
+  const { importTags } = await import('./tagRepository');
+  const catResult = await importCategories(ownerId, data.categories ?? []);
+  const tagResult = await importTags(ownerId, data.tags ?? []);
+
   const indexKey = KEY_PREFIXES.PASSWORDS_INDEX(ownerId);
   const index = (await storage.get<string[]>(indexKey)) ?? [];
   const existingIds = new Set(index);
@@ -434,9 +501,19 @@ export async function importPasswords(
         result.imported++;
       }
 
+      // 重映射分类/标签引用到当前保险库中的真实 ID
+      const remappedCategoryId = entry.categoryId
+        ? catResult.idMap[entry.categoryId] ?? entry.categoryId
+        : undefined;
+      const remappedTags = (entry.tags ?? [])
+        .map((t) => tagResult.idMap[t] ?? t)
+        .filter((t, i, arr) => arr.indexOf(t) === i);
+
       const importEntry: PasswordEntry = {
         ...entry,
         id,
+        categoryId: remappedCategoryId,
+        tags: remappedTags,
       };
 
       const key = KEY_PREFIXES.PASSWORD(ownerId, id);
@@ -455,6 +532,10 @@ export async function importPasswords(
   }
 
   await storage.put(indexKey, index);
+
+  result.categoriesCreated = catResult.created;
+  result.tagsCreated = tagResult.created;
+
   return result;
 }
 

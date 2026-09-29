@@ -6,6 +6,8 @@ import { getRequestAuthContext } from '@/lib/auth/context';
 import {
   getAllCategories,
   createCategory,
+  findCategoryByName,
+  getCategoryUsageCounts,
 } from '@/lib/repositories/categoryRepository';
 
 export const dynamic = 'force-dynamic';
@@ -13,8 +15,15 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const ctx = await getRequestAuthContext(request);
-    const categories = await getAllCategories(ctx.ownerId);
-    return jsonSuccess(categories);
+    const [categories, counts] = await Promise.all([
+      getAllCategories(ctx.ownerId),
+      getCategoryUsageCounts(ctx.ownerId),
+    ]);
+
+    return jsonSuccess(
+      categories.map((c) => ({ ...c, usageCount: counts[c.id] ?? 0 })),
+      { ownerId: ctx.ownerId }
+    );
   } catch (err) {
     return handleRouteError(err);
   }
@@ -26,7 +35,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const data = validateInput(categoryInputSchema, body);
 
-    const category = await createCategory(ctx.ownerId, data.name);
+    // Find-or-create 语义：同名分类已存在时直接返回（幂等）
+    const existing = await findCategoryByName(ctx.ownerId, data.name.trim());
+    if (existing) {
+      return jsonSuccess(existing, { existing: true }, { status: 200 });
+    }
+
+    const category = await createCategory(ctx.ownerId, data.name.trim());
     return jsonSuccess(category, undefined, { status: 201 });
   } catch (err) {
     return handleRouteError(err);

@@ -106,6 +106,13 @@ function generatePassword(options = {}) {
   return result.join('');
 }
 
+// 按名称查找标签，不存在则创建，返回标签 ID（find-or-create）
+async function findOrCreateTagId(name) {
+  const res = await apiRequest('/api/tags', 'POST', { name });
+  if (!res.ok) return null;
+  return res.data?.id || null;
+}
+
 // API Client
 async function apiRequest(endpoint, method = 'GET', body = null) {
   const config = await chrome.storage.local.get(['apiUrl', 'apiKey', 'masterPassword']);
@@ -251,13 +258,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           });
         }
 
+        // 先确保「chrome-extension」标签存在，再以标签 ID 引用
+        const tagId = await findOrCreateTagId('chrome-extension');
+
         return await apiRequest('/api/passwords', 'POST', {
           site: site || new URL(url).hostname,
           url,
           username: username || '',
           password,
           notes: notes || '由密码保险库浏览器插件保存',
-          tags: ['chrome-extension'],
+          tags: tagId ? [tagId] : [],
         });
       }
 

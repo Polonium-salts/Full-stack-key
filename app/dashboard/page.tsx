@@ -135,6 +135,11 @@ function DashboardInner() {
   function getCategoryById(id: string) {
     return categories.find((c) => c.id === id);
   }
+  function getTagLabel(tid: string) {
+    const t = getTagById(tid);
+    // 已删除/未知标签的兑底显示
+    return { name: t?.name ?? '未知标签', color: t?.color };
+  }
 
   return (
     <div className="space-y-6">
@@ -341,18 +346,18 @@ function DashboardInner() {
                   </Badge>
                 )}
                 {entry.tags.slice(0, 3).map((tid) => {
-                  const t = getTagById(tid);
-                  return t ? (
+                  const { name, color } = getTagLabel(tid);
+                  return (
                     <Badge
-                      key={t.id}
+                      key={tid}
                       variant="outline"
                       className="gap-1"
-                      style={t.color ? { borderColor: t.color, color: t.color } : undefined}
+                      style={color ? { borderColor: color, color } : undefined}
                     >
                       <TagIcon className="size-3" />
-                      {t.name}
+                      {name}
                     </Badge>
-                  ) : null;
+                  );
                 })}
                 {entry.tags.length > 3 && (
                   <Badge variant="secondary">+{entry.tags.length - 3}</Badge>

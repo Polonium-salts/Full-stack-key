@@ -195,8 +195,12 @@ export default function SettingsPage() {
       const data = JSON.parse(text) as ExportData;
       if (!data.passwords || !Array.isArray(data.passwords)) throw new Error('文件格式无效');
       const res = await importDataAction(data, strategy);
+      const metaParts: string[] = [];
+      if (res.categoriesCreated > 0) metaParts.push(`新分类 ${res.categoriesCreated}`);
+      if (res.tagsCreated > 0) metaParts.push(`新标签 ${res.tagsCreated}`);
       toast.success(
-        `导入完成：新增 ${res.imported}，跳过 ${res.skipped}，覆盖 ${res.overwritten}，重复 ${res.duplicated}`
+        `导入完成：新增 ${res.imported}，跳过 ${res.skipped}，覆盖 ${res.overwritten}，重复 ${res.duplicated}` +
+          (metaParts.length > 0 ? `（${metaParts.join('，')}）` : '')
       );
       e.target.value = '';
     } catch (err) {

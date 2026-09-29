@@ -29,12 +29,14 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  getCategoryUsageCounts,
 } from '@/lib/repositories/categoryRepository';
 import {
   getAllTags,
   createTag,
   updateTag,
   deleteTag,
+  getTagUsageCounts,
 } from '@/lib/repositories/tagRepository';
 import {
   listApiKeys,
@@ -90,7 +92,12 @@ function makeDecrypt({ masterKey }: ServerContext) {
 }
 
 export async function getInitStatus(): Promise<{ initialized: boolean }> {
-  return { initialized: await isInitialized() };
+  try {
+    return { initialized: await isInitialized() };
+  } catch (err) {
+    console.error('getInitStatus error:', err);
+    return { initialized: true };
+  }
 }
 
 export async function initAppAction(formData: FormData) {
@@ -283,25 +290,45 @@ export async function resetVaultAction() {
   return { ok: true, ...res };
 }
 
+function actionErrorMessage(err: unknown, fallback: string): string {
+  const msg = err instanceof Error ? err.message : '';
+  if (msg.includes('已存在')) return msg;
+  if (msg.toLowerCase().includes('duplicate')) return msg;
+  return fallback;
+}
+
 export async function listCategoriesAction() {
   const ctx = await getServerContext();
   return getAllCategories(ctx.ownerId);
 }
 
+export async function getCategoryCountsAction() {
+  const ctx = await getServerContext();
+  return getCategoryUsageCounts(ctx.ownerId);
+}
+
 export async function createCategoryAction(formData: FormData) {
   const ctx = await getServerContext();
   const name = String(formData.get('name') || '').trim();
-  if (!name) return { ok: false, error: 'Name is required' };
-  const cat = await createCategory(ctx.ownerId, name);
-  return { ok: true, id: cat.id };
+  if (!name) return { ok: false as const, error: '请输入分类名称' };
+  try {
+    const cat = await createCategory(ctx.ownerId, name);
+    return { ok: true as const, id: cat.id };
+  } catch (err) {
+    return { ok: false as const, error: actionErrorMessage(err, '创建分类失败') };
+  }
 }
 
 export async function updateCategoryAction(id: string, formData: FormData) {
   const ctx = await getServerContext();
   const name = String(formData.get('name') || '').trim();
-  if (!name) return { ok: false, error: 'Name is required' };
-  await updateCategory(ctx.ownerId, id, name);
-  return { ok: true };
+  if (!name) return { ok: false as const, error: '请输入分类名称' };
+  try {
+    await updateCategory(ctx.ownerId, id, name);
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: actionErrorMessage(err, '更新分类失败') };
+  }
 }
 
 export async function deleteCategoryAction(id: string) {
@@ -315,22 +342,35 @@ export async function listTagsAction() {
   return getAllTags(ctx.ownerId);
 }
 
+export async function getTagCountsAction() {
+  const ctx = await getServerContext();
+  return getTagUsageCounts(ctx.ownerId);
+}
+
 export async function createTagAction(formData: FormData) {
   const ctx = await getServerContext();
   const name = String(formData.get('name') || '').trim();
   const color = String(formData.get('color') || '').trim() || undefined;
-  if (!name) return { ok: false, error: 'Name is required' };
-  const tag = await createTag(ctx.ownerId, name, color);
-  return { ok: true, id: tag.id };
+  if (!name) return { ok: false as const, error: '请输入标签名称' };
+  try {
+    const tag = await createTag(ctx.ownerId, name, color);
+    return { ok: true as const, id: tag.id };
+  } catch (err) {
+    return { ok: false as const, error: actionErrorMessage(err, '创建标签失败') };
+  }
 }
 
 export async function updateTagAction(id: string, formData: FormData) {
   const ctx = await getServerContext();
   const name = String(formData.get('name') || '').trim();
   const color = formData.has('color') ? (String(formData.get('color')) || undefined) : undefined;
-  if (!name) return { ok: false, error: 'Name is required' };
-  await updateTag(ctx.ownerId, id, { name, color });
-  return { ok: true };
+  if (!name) return { ok: false as const, error: '请输入标签名称' };
+  try {
+    await updateTag(ctx.ownerId, id, { name, color });
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: actionErrorMessage(err, '更新标签失败') };
+  }
 }
 
 export async function deleteTagAction(id: string) {
