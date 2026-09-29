@@ -254,14 +254,18 @@ export default function PasswordDetailPage({ params }: { params: Promise<{ id: s
             <Label>用户名</Label>
             {mode === 'view' ? (
               <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
-                <span className="min-w-0 flex-1 truncate text-sm">{entry.username}</span>
-                <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => handleCopy('user', entry.username)}>
-                  {copied === 'user' ? <Check className="text-green-600" /> : <Copy />}
-                  <span className="sr-only">复制用户名</span>
-                </Button>
+                <span className="min-w-0 flex-1 truncate text-sm">
+                  {entry.username || <span className="text-muted-foreground italic font-normal">(未设置用户名)</span>}
+                </span>
+                {entry.username ? (
+                  <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => handleCopy('user', entry.username)}>
+                    {copied === 'user' ? <Check className="text-green-600" /> : <Copy />}
+                    <span className="sr-only">复制用户名</span>
+                  </Button>
+                ) : null}
               </div>
             ) : (
-              <Input name="username" required defaultValue={entry.username} autoComplete="off" />
+              <Input name="username" defaultValue={entry.username} placeholder="用户名（可选）" autoComplete="off" />
             )}
           </div>
 

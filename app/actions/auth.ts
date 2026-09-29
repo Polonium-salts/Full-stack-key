@@ -99,18 +99,38 @@ export async function initAppAction(formData: FormData) {
   if (password !== confirm) {
     return { ok: false, error: 'Passwords do not match' };
   }
-  const result = await initializeApp(password);
-  const login = await loginWithMasterPassword(password);
-  const cookieStore = await cookies();
-  const cookieName = process.env.SESSION_COOKIE_NAME || 'pm_session';
-  cookieStore.set(cookieName, login.sessionId, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/',
-    expires: new Date(login.expiresAt),
-  });
-  return { ok: true, apiKey: result.apiKey };
+  try {
+    const already = await isInitialized();
+    if (already) {
+      // If already initialized, attempt to log in directly with the master password
+      const login = await loginWithMasterPassword(password);
+      const cookieStore = await cookies();
+      const cookieName = process.env.SESSION_COOKIE_NAME || 'pm_session';
+      cookieStore.set(cookieName, login.sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+        expires: new Date(login.expiresAt),
+      });
+      return { ok: true, alreadyInitialized: true };
+    }
+
+    const result = await initializeApp(password);
+    const login = await loginWithMasterPassword(password);
+    const cookieStore = await cookies();
+    const cookieName = process.env.SESSION_COOKIE_NAME || 'pm_session';
+    cookieStore.set(cookieName, login.sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      expires: new Date(login.expiresAt),
+    });
+    return { ok: true, apiKey: result.apiKey };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Initialization failed' };
+  }
 }
 
 export async function loginAction(formData: FormData) {
@@ -188,8 +208,8 @@ export async function createPasswordAction(formData: FormData) {
     tags,
     categoryId: String(formData.get('categoryId') || '') || undefined,
   };
-  if (!input.site || !input.username || !input.password) {
-    return { ok: false, error: 'Site, username and password are required' };
+  if (!input.site || !input.password) {
+    return { ok: false, error: 'Site and password are required' };
   }
   const encryptFn = makeEncrypt(ctx);
   const entry = await createPasswordEntry({ ownerId: ctx.ownerId, entry: input, encryptFn });
@@ -210,7 +230,7 @@ export async function updatePasswordAction(id: string, formData: FormData) {
     const update: PasswordEntryUpdate = {
       site: String(formData.get('site') || '') || existing.site,
       url: formData.has('url') ? (String(formData.get('url')) || undefined) : undefined,
-      username: String(formData.get('username') || '') || existing.username,
+      username: formData.has('username') ? String(formData.get('username') || '') : existing.username,
       password: newPassword || undefined,
       notes: formData.has('notes') ? (newNotes || undefined) : undefined,
       tags: formData.has('tags') ? tags : undefined,
@@ -364,4 +384,10 @@ export async function generatePasswordAction(options?: {
   const pwd = generatePassword(options || { length: 20, uppercase: true, lowercase: true, numbers: true, symbols: true });
   const strength = evaluatePasswordStrength(pwd);
   return { password: pwd, strength };
+}
+
+export async function getStorageStatusAction() {
+  await getServerContext();
+  const { getStorageInfo } = await import('@/lib/storage');
+  return getStorageInfo();
 }

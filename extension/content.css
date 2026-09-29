@@ -1,0 +1,548 @@
+/* KeyVault Chrome Extension - Injected Page Styles
+ * Designed to strictly match the server-side shadcn/ui neutral design system
+ */
+
+/* 1. In-input Shield Badge */
+.keyvault-input-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #18181b;
+  color: #fafafa;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: all 0.15s ease;
+  user-select: none;
+  pointer-events: auto;
+  opacity: 0.85;
+}
+
+.keyvault-input-badge:hover {
+  opacity: 1;
+  transform: scale(1.08);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+}
+
+.keyvault-input-badge svg {
+  width: 13px;
+  height: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-input-badge {
+    background: #27272a;
+    color: #fafafa;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* 2. Floating Dropdown for Accounts / Actions */
+.keyvault-floating-dropdown {
+  position: fixed;
+  width: 260px;
+  max-height: 380px;
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  z-index: 2147483647;
+  overflow-y: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  animation: keyvault-pop-in 0.15s ease-out;
+  padding: 5px;
+  color: #09090b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-floating-dropdown {
+    background: #18181b;
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #fafafa;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@keyframes keyvault-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.keyvault-dropdown-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #71717a;
+  padding: 6px 8px 4px 8px;
+}
+
+.keyvault-dropdown-section-title {
+  font-size: 11px;
+  color: #a1a1aa;
+  padding: 2px 8px 4px 8px;
+}
+
+.keyvault-dropdown-item {
+  display: flex;
+  flex-direction: column;
+  padding: 7px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.keyvault-dropdown-item:hover {
+  background: #f4f4f5;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-dropdown-item:hover {
+    background: #27272a;
+  }
+}
+
+.keyvault-dropdown-username {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #09090b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-dropdown-username {
+    color: #fafafa;
+  }
+}
+
+.keyvault-dropdown-site {
+  font-size: 11px;
+  color: #71717a;
+  margin-top: 1px;
+}
+
+.keyvault-dropdown-divider {
+  height: 1px;
+  background: #e4e4e7;
+  margin: 4px 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-dropdown-divider {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.keyvault-action-remember,
+.keyvault-action-generate {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: #09090b;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-action-remember,
+  .keyvault-action-generate {
+    color: #fafafa;
+  }
+}
+
+.keyvault-action-remember:hover,
+.keyvault-action-generate:hover {
+  background: #f4f4f5;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-action-remember:hover,
+  .keyvault-action-generate:hover {
+    background: #27272a;
+  }
+}
+
+.keyvault-item-icon svg {
+  display: block;
+}
+
+/* 3. Confirmation Modal Dialog (记住密码账号确认弹窗) */
+.keyvault-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  z-index: 2147483646;
+  animation: keyvault-fade-in 0.15s ease-out;
+}
+
+@keyframes keyvault-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.keyvault-save-banner {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  animation: keyvault-slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes keyvault-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.keyvault-fade-out {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.97);
+  transition: all 0.2s ease-in;
+}
+
+.keyvault-banner-card {
+  width: 330px;
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 12px 28px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-banner-card {
+    background: #18181b;
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.keyvault-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.keyvault-banner-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #18181b;
+  color: #fafafa;
+  flex-shrink: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-banner-icon {
+    background: #fafafa;
+    color: #18181b;
+  }
+}
+
+.keyvault-banner-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.keyvault-banner-title-box {
+  flex: 1;
+  min-width: 0;
+}
+
+.keyvault-banner-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.keyvault-banner-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #09090b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-banner-title {
+    color: #fafafa;
+  }
+}
+
+.keyvault-badge-tag {
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 500;
+  background: #f4f4f5;
+  color: #71717a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-badge-tag {
+    background: #27272a;
+    color: #a1a1aa;
+  }
+}
+
+.keyvault-badge-update {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-badge-update {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+  }
+}
+
+.keyvault-banner-subtitle {
+  font-size: 11px;
+  color: #71717a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.keyvault-banner-close {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: #a1a1aa;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.keyvault-banner-close:hover {
+  background: #f4f4f5;
+  color: #09090b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-banner-close:hover {
+    background: #27272a;
+    color: #fafafa;
+  }
+}
+
+.keyvault-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.keyvault-banner-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #71717a;
+  margin-bottom: 3px;
+}
+
+.keyvault-banner-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 9px;
+  font-size: 12px;
+  border: 1px solid #e4e4e7;
+  border-radius: 6px;
+  outline: none;
+  background: #ffffff;
+  color: #09090b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-banner-field input {
+    background: #09090b;
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #fafafa;
+  }
+}
+
+.keyvault-banner-field input:focus {
+  border-color: #18181b;
+  box-shadow: 0 0 0 1px #18181b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-banner-field input:focus {
+    border-color: #fafafa;
+    box-shadow: 0 0 0 1px #fafafa;
+  }
+}
+
+.keyvault-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.keyvault-eye-btn {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.keyvault-eye-btn:hover {
+  opacity: 1;
+}
+
+.keyvault-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #71717a;
+  cursor: pointer;
+  user-select: none;
+  margin-top: 2px;
+}
+
+.keyvault-checkbox-row input {
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+}
+
+.keyvault-banner-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.keyvault-btn-cancel {
+  padding: 6px 11px;
+  background: transparent;
+  border: 1px solid #e4e4e7;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #71717a;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-btn-cancel {
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #a1a1aa;
+  }
+}
+
+.keyvault-btn-cancel:hover {
+  background: #f4f4f5;
+  color: #09090b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-btn-cancel:hover {
+    background: #27272a;
+    color: #fafafa;
+  }
+}
+
+.keyvault-btn-save {
+  padding: 6px 13px;
+  background: #18181b;
+  color: #fafafa;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-btn-save {
+    background: #fafafa;
+    color: #18181b;
+  }
+}
+
+.keyvault-btn-save:hover {
+  opacity: 0.9;
+}
+
+.keyvault-save-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+}
+
+.keyvault-success-icon {
+  width: 20px;
+  height: 20px;
+  color: #10b981;
+}
+
+.keyvault-success-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #09090b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-success-text {
+    color: #fafafa;
+  }
+}
+
+/* 4. Sonner-style Toast */
+.keyvault-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #18181b;
+  color: #fafafa;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 2147483647;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .keyvault-toast {
+    background: #fafafa;
+    color: #18181b;
+  }
+}
+
+.keyvault-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}

@@ -1,5 +1,6 @@
 import {
   deriveMasterKey,
+  deriveMasterKeyBytes,
   hashMasterPassword,
   generateSalt,
   generateSessionToken,
@@ -20,7 +21,7 @@ import {
 import {
   reencryptAllPasswordEntries,
 } from '@/lib/repositories/passwordRepository';
-import { createApiKey } from './apiKey';
+import { generateApiKeyRecord } from './apiKey';
 import {
   AuthenticationError,
   ConflictError,
@@ -56,7 +57,7 @@ export async function initializeApp(masterPassword: string): Promise<InitResult>
 
   const masterPasswordHash = await hashMasterPassword(masterPassword, masterSalt, iterations);
 
-  const { apiKey, record: initialApiKey } = await createApiKey('Initial API Key');
+  const { apiKey, record: initialApiKey } = await generateApiKeyRecord('Initial API Key');
 
   await initializeConfig(
     masterPasswordHash,
@@ -186,12 +187,11 @@ export async function loginWithMasterPassword(
     );
   }
 
-  const masterKey = await deriveMasterKey(
+  const masterKeyRaw = await deriveMasterKeyBytes(
     masterPassword,
     config.masterSalt,
     config.pbkdf2Iterations
   );
-  const masterKeyRaw = new Uint8Array(await crypto.subtle.exportKey('raw', masterKey));
   const sessionSecret = generateSalt(32);
   const sessionKey = await importAESKey(new TextEncoder().encode(sessionSecret.padEnd(32, '0').slice(0, 32)));
   const exportable = Array.from(masterKeyRaw).map((b) => b.toString(16).padStart(2, '0')).join('');

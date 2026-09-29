@@ -9,11 +9,16 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".open-next/**",
+    ".data/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
   ]),
   {
+    plugins: {
+      "react-hooks": nextVitals[0].plugins["react-hooks"],
+    },
     rules: {
       // React 19 引入的严格规则，会将客户端组件中「mount 时异步拉取数据并 setState」
       // 的标准模式误报为 error（即使 setState 已位于 await 之后）。降级为 warn 保留提示。

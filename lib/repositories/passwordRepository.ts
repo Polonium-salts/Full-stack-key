@@ -80,7 +80,7 @@ export async function createPasswordEntry({ ownerId, entry, encryptFn }: CreateO
     id,
     site: entry.site,
     url: entry.url,
-    username: entry.username,
+    username: entry.username || '',
     encryptedPassword: passwordEncrypted.encrypted,
     passwordIv: passwordEncrypted.iv,
     passwordTag: passwordEncrypted.tag,

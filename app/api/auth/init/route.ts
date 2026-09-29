@@ -3,6 +3,7 @@ import { handleRouteError } from '@/lib/errors';
 import { validateInput, initSchema } from '@/lib/utils/validation';
 import { jsonSuccess, jsonError } from '@/lib/utils/response';
 import { initializeApp, isInitialized } from '@/lib/auth/init';
+import { getStorageInfo } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,8 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     const initialized = await isInitialized();
-    return jsonSuccess({ initialized });
+    const storage = getStorageInfo();
+    return jsonSuccess({ initialized, storage });
   } catch (err) {
     return handleRouteError(err);
   }

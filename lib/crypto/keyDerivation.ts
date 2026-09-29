@@ -45,7 +45,8 @@ export function generateSalt(length = SALT_LENGTH): string {
 export async function deriveMasterKey(
   password: string,
   salt: string,
-  iterations: number = DEFAULT_ITERATIONS
+  iterations: number = DEFAULT_ITERATIONS,
+  extractable: boolean = true
 ): Promise<CryptoKey> {
   const crypto = ensureCrypto();
   const passwordBytes = encodeUtf8(password) as unknown as BufferSource;
@@ -68,7 +69,7 @@ export async function deriveMasterKey(
     },
     baseKey,
     { name: 'AES-GCM', length: 256 },
-    false,
+    extractable,
     ['encrypt', 'decrypt']
   );
 }

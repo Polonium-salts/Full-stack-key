@@ -79,7 +79,7 @@ export async function validateApiKey(apiKeyStr: string): Promise<ValidatedApiKey
   };
 }
 
-export async function createApiKey(name: string): Promise<{ apiKey: string; record: ApiKey }> {
+export async function generateApiKeyRecord(name: string): Promise<{ apiKey: string; record: ApiKey }> {
   const rawKey = generateAPIKey();
   const keyHash = await hashAPIKey(rawKey);
   const now = new Date().toISOString();
@@ -92,12 +92,16 @@ export async function createApiKey(name: string): Promise<{ apiKey: string; reco
     revoked: false,
   };
 
-  await addApiKey(record);
-
   return {
     apiKey: rawKey,
     record,
   };
+}
+
+export async function createApiKey(name: string): Promise<{ apiKey: string; record: ApiKey }> {
+  const result = await generateApiKeyRecord(name);
+  await addApiKey(result.record);
+  return result;
 }
 
 export async function listApiKeys(): Promise<Array<Omit<ApiKey, 'keyHash'> & { keyPrefix: string }>> {

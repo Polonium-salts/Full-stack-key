@@ -61,13 +61,13 @@ function decodeBase64(base64: string): Uint8Array {
   return bytes;
 }
 
-export async function importAESKey(rawKeyBytes: Uint8Array): Promise<CryptoKey> {
+export async function importAESKey(rawKeyBytes: Uint8Array, extractable = true): Promise<CryptoKey> {
   const crypto = ensureCrypto();
   return crypto.subtle.importKey(
     'raw',
     rawKeyBytes as unknown as BufferSource,
     { name: ALGORITHM, length: KEY_LENGTH },
-    false,
+    extractable,
     ['encrypt', 'decrypt']
   );
 }

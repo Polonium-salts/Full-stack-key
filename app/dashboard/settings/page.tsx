@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, KeyRound } from 'lucide-react';
+import { Download, KeyRound, Database } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   listApiKeysAction,
@@ -12,6 +12,7 @@ import {
   changeMasterPasswordAction,
   exportDataAction,
   importDataAction,
+  getStorageStatusAction,
 } from '@/app/actions/auth';
 import type { ExportData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,18 @@ export default function SettingsPage() {
   const [newKey, setNewKey] = useState<string | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<ApiKeyRow | null>(null);
   const [pendingRegen, setPendingRegen] = useState<ApiKeyRow | null>(null);
+  const [storageInfo, setStorageInfo] = useState<{
+    driver: 'sqlite' | 'cloudflare' | 'memory';
+    configuredType: string;
+    environment: string;
+    isPersistent: boolean;
+    details: {
+      dbPath?: string;
+      bindingName?: string;
+      description: string;
+      fallbackReason?: string;
+    };
+  } | null>(null);
 
   async function loadKeys() {
     const data = await listApiKeysAction();
@@ -60,6 +73,11 @@ export default function SettingsPage() {
     listApiKeysAction()
       .then((data) => {
         if (!cancelled) setApiKeys(data as ApiKeyRow[]);
+      })
+      .catch(() => {});
+    getStorageStatusAction()
+      .then((info) => {
+        if (!cancelled) setStorageInfo(info);
       })
       .catch(() => {});
     return () => {
@@ -288,7 +306,73 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* 数据 */}
-        <TabsContent value="data" className="mt-4">
+        <TabsContent value="data" className="mt-4 space-y-4">
+          <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Database className="h-5 w-5 text-primary" />
+                <div>
+                  <h2 className="font-semibold">存储引擎状态</h2>
+                  <p className="text-xs text-muted-foreground">根据当前部署环境自动适配的底层数据存储方式</p>
+                </div>
+              </div>
+              {storageInfo && (
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    storageInfo.isPersistent
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                  }`}
+                >
+                  {storageInfo.isPersistent ? '● 持久化存储' : '○ 内存临时存储'}
+                </span>
+              )}
+            </div>
+
+            {storageInfo ? (
+              <div className="space-y-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg bg-muted/50 p-3">
+                    <span className="text-xs text-muted-foreground block mb-0.5">当前存储驱动</span>
+                    <span className="font-medium text-foreground">
+                      {storageInfo.driver === 'sqlite'
+                        ? 'SQLite 本地数据库'
+                        : storageInfo.driver === 'cloudflare'
+                        ? 'Cloudflare KV 分布式键值'
+                        : 'MemoryKV 内存临时'}
+                    </span>
+                  </div>
+                  <div className="rounded-lg bg-muted/50 p-3">
+                    <span className="text-xs text-muted-foreground block mb-0.5">环境检测 / 配置模式</span>
+                    <span className="font-medium text-foreground">
+                      {storageInfo.environment.toUpperCase()} / {storageInfo.configuredType}
+                    </span>
+                  </div>
+                </div>
+
+                {storageInfo.details?.dbPath && (
+                  <div className="rounded-lg bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground break-all">
+                    <span className="font-semibold text-foreground mr-1.5">SQLite 数据库路径:</span>
+                    {storageInfo.details.dbPath}
+                  </div>
+                )}
+                {storageInfo.details?.bindingName && (
+                  <div className="rounded-lg bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground mr-1.5">Cloudflare KV 绑定:</span>
+                    {storageInfo.details.bindingName}
+                  </div>
+                )}
+                {storageInfo.details?.fallbackReason && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-50/50 p-3 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                    ℹ️ {storageInfo.details.fallbackReason}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Skeleton className="h-20 w-full rounded-lg" />
+            )}
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-3 rounded-xl border bg-card p-6 shadow-sm">
               <h2 className="font-semibold">导出数据</h2>

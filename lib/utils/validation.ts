@@ -4,7 +4,7 @@ import type { PasswordEntryInput, PasswordEntryUpdate } from '@/lib/types';
 export const passwordEntryInputSchema = z.object({
   site: z.string().min(1, 'Site name is required').max(255),
   url: z.string().url('Invalid URL format').optional().or(z.literal('')),
-  username: z.string().min(1, 'Username is required').max(255),
+  username: z.string().max(255).optional(),
   password: z.string().min(1, 'Password is required'),
   notes: z.string().max(10000).optional(),
   tags: z.array(z.string().min(1).max(50)).max(50).optional(),
@@ -14,7 +14,7 @@ export const passwordEntryInputSchema = z.object({
 export const passwordEntryUpdateSchema = z.object({
   site: z.string().min(1).max(255).optional(),
   url: z.string().url().optional().or(z.literal('')),
-  username: z.string().min(1).max(255).optional(),
+  username: z.string().max(255).optional(),
   password: z.string().min(1).optional(),
   notes: z.string().max(10000).optional(),
   tags: z.array(z.string().min(1).max(50)).max(50).optional(),

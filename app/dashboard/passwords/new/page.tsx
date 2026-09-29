@@ -120,8 +120,8 @@ export default function NewPasswordPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="username">用户名 / 邮箱 *</Label>
-            <Input id="username" name="username" required placeholder="your@email.com" autoComplete="off" />
+            <Label htmlFor="username">用户名 / 邮箱</Label>
+            <Input id="username" name="username" placeholder="your@email.com（可选）" autoComplete="off" />
           </div>
 
           <div className="space-y-2">

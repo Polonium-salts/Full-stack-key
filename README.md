@@ -30,9 +30,31 @@
 
 ---
 
+## 多环境存储适配器（Multi-Environment Storage Adapter）
+
+系统内置智能多环境存储适配器，根据当前运行时与生产环境配置**全自动选择最佳存储引擎**：
+
+| 环境 / 部署方式 | 自动选择存储 | 特性说明 |
+| :--- | :--- | :--- |
+| **Cloudflare Pages / Workers (生产环境)** | **Cloudflare KV** | 全球边缘分布式键值存储，高并发、低延迟 |
+| **本地开发 / 自建 Node.js 服务 (本地环境)** | **SQLite 本地数据库** | 零配置单文件持久化（默认 `.data/vault.sqlite`），服务重启数据不丢失 |
+| **测试 / 临时调试环境** | **MemoryKV** | 内存易失性存储，进程退出即清空 |
+
+### 存储配置环境变量（`.env.local` 或生产环境变量）
+
+```bash
+# 存储驱动选择：auto（自动检测，推荐） | sqlite | cloudflare | memory
+STORAGE_TYPE=auto
+
+# SQLite 数据库文件存储路径（本地/Node.js 生效，支持自定义或 :memory:）
+SQLITE_PATH=.data/vault.sqlite
+```
+
+---
+
 ## 快速开始：本地开发（无需 Cloudflare 账号）
 
-本地开发模式自动使用 **内存版 KV（MemoryKV）**，不需要 Cloudflare 账号、不需要真实 KV 命名空间：
+本地运行自动使用 **SQLite 本地轻量级数据库** 进行持久化存储，无需任何外部数据库服务：
 
 ```bash
 # 1. 安装依赖
@@ -48,8 +70,7 @@ npm run dev
 打开浏览器访问 [http://localhost:3000](http://localhost:3000)。首次访问会被重定向到 [/login](http://localhost:3000/login)：
 - **未初始化**：显示"设置主密码"表单，输入两次主密码 → 自动创建首枚 API Key 并跳转 Dashboard
 - **已初始化**：输入主密码 → 通过 HttpOnly Cookie 建立会话 → 进入 Dashboard
-
-> 💡 **本地 MemoryKV 会在进程重启时清空**，适合开发调试。生产部署请使用 Cloudflare KV。
+- **数据持久化**：本地密码数据保存在 `.data/vault.sqlite` 中，开发调试与重启服务数据不丢失。如需使用纯内存模式，设置 `STORAGE_TYPE=memory` 即可。
 
 ---
 
@@ -193,7 +214,7 @@ my-app/
 │   ├── crypto/{ciphers,keyDerivation,generator,index}.ts  # AES/PBKDF2/密码生成
 │   ├── errors/index.ts               # 自定义错误 + handleRouteError
 │   ├── repositories/{password,category,tag,config}Repository.ts
-│   ├── storage/{types,memoryKV,cloudflareKV,index}.ts   # KV 抽象 + 两种实现
+│   ├── storage/{types,memoryKV,cloudflareKV,sqliteKV,adapter,index}.ts   # 多环境存储适配器 + SQLite/Cloudflare/Memory 实现
 │   ├── types/index.ts                # 全局 TypeScript 类型
 │   └── utils/{response,validation}.ts  # JSON 响应包装 + Zod 校验
 ├── proxy.ts                          # Next.js 16 Proxy（CORS + 页面重定向 + 安全头）
@@ -213,6 +234,8 @@ my-app/
 
 | 变量 | 说明 | 默认 |
 |---|---|---|
+| `STORAGE_TYPE` | 存储驱动方式（`auto` 自动检测 / `sqlite` / `cloudflare` / `memory`） | `auto` |
+| `SQLITE_PATH` | SQLite 数据库文件路径（本地 / Node.js 运行时生效） | `.data/vault.sqlite` |
 | `CORS_ALLOWED_ORIGINS` | 允许的 CORS 源，逗号分隔或 `*` | `*` |
 | `CORS_ALLOW_CREDENTIALS` | 是否允许 Cookie | `true` |
 | `PBKDF2_ITERATIONS` | PBKDF2 迭代次数，越高越安全但越慢 | `200000` |

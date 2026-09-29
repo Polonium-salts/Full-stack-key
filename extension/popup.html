@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>密码保险库 - 扩展助手</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-root">
+    <!-- Header: Consistent with Server-side Layout Header & VaultLogo -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo">
+          <!-- ShieldCheck icon identical to VaultLogo in server layout.tsx -->
+          <svg class="icon-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <div class="brand-title">密码保险库</div>
+          <div class="brand-subtitle">私密 · 安全 · 同步</div>
+        </div>
+      </div>
+
+      <div class="header-tools">
+        <span class="status-indicator" id="status-badge" title="连接状态">
+          <span class="status-dot"></span>
+          <span class="status-text">检测中</span>
+        </span>
+        <button class="btn-icon" id="btn-theme-toggle" title="切换暗色/亮色主题" aria-label="切换主题">
+          <!-- Sun icon (shown in dark mode) -->
+          <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+          </svg>
+          <!-- Moon icon (shown in light mode) -->
+          <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+          </svg>
+        </button>
+        <button class="btn-icon" id="btn-toggle-settings" title="扩展设置" aria-label="设置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Setup View (Minimalist initialization with API URL + Key) -->
+    <main class="view-container" id="view-setup" style="display: none;">
+      <div class="setup-card">
+        <div class="setup-header">
+          <div class="setup-badge-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="7.5" cy="15.5" r="5.5"/>
+              <path d="m21 2-9.6 9.6"/>
+              <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+            </svg>
+          </div>
+          <h2 class="setup-title">连接密码保险库</h2>
+          <p class="setup-desc">仅需填写 API 服务地址与 API Key 密钥即可完成绑定</p>
+        </div>
+
+        <form id="setup-form" class="space-y-4">
+          <div class="form-field">
+            <label for="setup-api-url" class="field-label">API 服务地址</label>
+            <input type="url" id="setup-api-url" class="field-input" placeholder="http://localhost:3000" required />
+            <span class="field-hint">本地默认为 http://localhost:3000，或云端域名</span>
+          </div>
+
+          <div class="form-field">
+            <label for="setup-api-key" class="field-label">API Key 密钥</label>
+            <input type="text" id="setup-api-key" class="field-input" placeholder="pm_live_..." required />
+            <span class="field-hint">从 Web 控制台「设置 -> API 密钥」中生成并复制</span>
+          </div>
+
+          <details class="advanced-collapsible">
+            <summary class="collapsible-summary">高级选项（可选）</summary>
+            <div class="form-field mt-3">
+              <label for="setup-master-password" class="field-label">主密码</label>
+              <input type="password" id="setup-master-password" class="field-input" placeholder="可选，留空由 API Key 独立加密" />
+              <span class="field-hint">如需与主密码完全共享对称解密密文时填写</span>
+            </div>
+          </details>
+
+          <div class="alert-box" id="setup-feedback" style="display: none;"></div>
+
+          <button type="submit" class="btn btn-primary btn-full" id="btn-save-setup">
+            测试并连接保险库
+          </button>
+        </form>
+      </div>
+    </main>
+
+    <!-- Main Views -->
+    <main class="view-container" id="view-main">
+      <!-- Tabs (Segmented Control matching shadcn TabsList) -->
+      <div class="tabs-nav-wrapper">
+        <div class="tabs-list" role="tablist">
+          <button class="tab-trigger active" data-tab="tab-current" role="tab">当前网站</button>
+          <button class="tab-trigger" data-tab="tab-vault" role="tab">全部密码</button>
+          <button class="tab-trigger" data-tab="tab-generator" role="tab">密码生成</button>
+        </div>
+      </div>
+
+      <!-- Tab 1: Current Site -->
+      <section class="tab-panel active" id="tab-current" role="tabpanel">
+        <div class="site-header-bar">
+          <div class="site-info-group">
+            <span class="site-host-label">当前网页</span>
+            <span class="site-host-value truncate" id="current-hostname">loading...</span>
+          </div>
+          <button class="btn btn-outline btn-xs" id="btn-show-add-current">
+            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            新建此站
+          </button>
+        </div>
+
+        <div class="cards-scroller" id="current-site-cards">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Inline Add Card Panel -->
+        <div class="inline-card-panel" id="add-current-panel" style="display: none;">
+          <div class="inline-card-header">
+            <h3 class="inline-card-title">为此网站保存密码</h3>
+            <button class="btn-icon-xs" id="btn-cancel-add-current">&times;</button>
+          </div>
+          <form id="add-current-form" class="space-y-3">
+            <div class="form-field">
+              <label class="field-label">网站标识</label>
+              <input type="text" id="add-site" class="field-input field-input-sm" required />
+            </div>
+            <div class="form-field">
+              <label class="field-label">账号 / 用户名（可选）</label>
+              <input type="text" id="add-username" class="field-input field-input-sm" placeholder="user@example.com（可选）" />
+            </div>
+            <div class="form-field">
+              <label class="field-label">密码</label>
+              <div class="input-action-group">
+                <input type="password" id="add-password" class="field-input field-input-sm" required />
+                <button type="button" class="btn-action-icon" id="btn-gen-for-add" title="自动生成强密码">✨</button>
+              </div>
+            </div>
+            <div class="flex-row-end gap-2 pt-1">
+              <button type="button" class="btn btn-ghost btn-xs" id="btn-cancel-add-card">取消</button>
+              <button type="submit" class="btn btn-primary btn-xs" id="btn-submit-add-card">保存记录</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Tab 2: Vault Search -->
+      <section class="tab-panel" id="tab-vault" role="tabpanel">
+        <div class="search-bar-wrapper">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="search" id="vault-search-input" class="search-input" placeholder="搜索网站、网址或用户名..." />
+        </div>
+
+        <div class="cards-scroller" id="vault-cards-list">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="panel-bottom-footer">
+          <button class="link-subtle" id="btn-open-web-dashboard">
+            <span>打开网页控制台</span>
+            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Tab 3: Password Generator -->
+      <section class="tab-panel" id="tab-generator" role="tabpanel">
+        <div class="generator-container">
+          <!-- Password display & quick actions -->
+          <div class="generator-display-box">
+            <input type="text" id="gen-password-display" class="generator-display-input" readonly spellcheck="false" />
+            <button class="btn-icon-sm" id="btn-regen-pwd" title="重新生成">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+            </button>
+            <button class="btn-icon-sm" id="btn-copy-gen-pwd" title="复制密码">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            </button>
+          </div>
+
+          <!-- 5-Segment Strength Meter identical to components/password-strength.tsx -->
+          <div class="strength-widget">
+            <div class="strength-segments" id="gen-strength-segments">
+              <div class="seg" data-index="0"></div>
+              <div class="seg" data-index="1"></div>
+              <div class="seg" data-index="2"></div>
+              <div class="seg" data-index="3"></div>
+              <div class="seg" data-index="4"></div>
+            </div>
+            <span class="strength-caption" id="gen-strength-text">极强</span>
+          </div>
+
+          <!-- Length Slider -->
+          <div class="slider-wrapper">
+            <div class="slider-meta">
+              <span class="meta-label">密码长度</span>
+              <span class="meta-badge" id="gen-length-val">20</span>
+            </div>
+            <input type="range" id="gen-length-slider" class="range-slider" min="8" max="64" value="20" />
+          </div>
+
+          <!-- Options Grid -->
+          <div class="generator-options-grid">
+            <label class="check-control">
+              <input type="checkbox" id="gen-opt-upper" checked />
+              <span class="check-box"></span>
+              <span class="check-label">大写字母 (A-Z)</span>
+            </label>
+            <label class="check-control">
+              <input type="checkbox" id="gen-opt-lower" checked />
+              <span class="check-box"></span>
+              <span class="check-label">小写字母 (a-z)</span>
+            </label>
+            <label class="check-control">
+              <input type="checkbox" id="gen-opt-numbers" checked />
+              <span class="check-box"></span>
+              <span class="check-label">数字 (0-9)</span>
+            </label>
+            <label class="check-control">
+              <input type="checkbox" id="gen-opt-symbols" checked />
+              <span class="check-box"></span>
+              <span class="check-label">特殊字符 (!@#$)</span>
+            </label>
+          </div>
+
+          <button class="btn btn-primary btn-full mt-3" id="btn-fill-current-gen">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            填入当前网页输入框
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Sonner-style Toast -->
+    <div class="toast-viewport" id="popup-toast"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

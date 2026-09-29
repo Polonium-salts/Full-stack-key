@@ -65,14 +65,20 @@ export async function getRequestAuthContext(request: NextRequest | Request): Pro
     const { ownerId } = requireApiKeyOwner(validated);
     const masterPassword = extractMasterPassword(request as Request);
 
-    if (!masterPassword) {
-      throw new AuthenticationError(
-        'API Key authentication requires X-Master-Password header for encryption',
-        'AUTH_MISSING_MASTER_PASSWORD'
+    let masterKey: CryptoKey;
+    if (masterPassword) {
+      masterKey = await getMasterKeyFromPassword(masterPassword);
+    } else {
+      const config = await requireConfig();
+      // When X-Master-Password is not provided (e.g. extension initialized with API Key only),
+      // securely derive encryption key from the API Key's hash
+      masterKey = await deriveMasterKey(
+        validated.keyHash || validated.apiKeyId || 'api_key_default',
+        config.masterSalt,
+        10000
       );
     }
 
-    const masterKey = await getMasterKeyFromPassword(masterPassword);
     return {
       ownerId,
       masterKey,

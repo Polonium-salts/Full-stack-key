@@ -28,7 +28,7 @@ export interface PasswordEntryDecrypted extends Omit<PasswordEntry, 'encryptedPa
 export interface PasswordEntryInput {
   site: string;
   url?: string;
-  username: string;
+  username?: string;
   password: string;
   notes?: string;
   tags?: string[];
