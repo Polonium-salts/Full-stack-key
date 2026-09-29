@@ -9,6 +9,14 @@ export function getStorageInfo(bindingNameOrOptions?: string | KVStorageOptions)
   return storageAdapterManager.getStorageInfo(bindingNameOrOptions);
 }
 
+export function getStorageStats(bindingNameOrOptions?: string | KVStorageOptions): Promise<{
+  fileSizeBytes: number;
+  totalKeys: number;
+  estimatedPayloadBytes: number;
+}> {
+  return storageAdapterManager.getStorageStats(bindingNameOrOptions);
+}
+
 export function resetStorageForTesting(): void {
   storageAdapterManager.reset();
 }

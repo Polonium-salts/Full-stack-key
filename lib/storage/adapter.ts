@@ -252,6 +252,52 @@ export class StorageAdapterManager {
     return this.currentStorageInfo!;
   }
 
+  public async getStorageStats(optionsOrBinding?: string | KVStorageOptions): Promise<{
+    fileSizeBytes: number;
+    totalKeys: number;
+    estimatedPayloadBytes: number;
+  }> {
+    const storage = this.getStorage(optionsOrBinding);
+    const info = this.getStorageInfo(optionsOrBinding);
+
+    let fileSizeBytes = 0;
+    let totalKeys = 0;
+    let estimatedPayloadBytes = 0;
+
+    if (info.driver === 'sqlite' && storage instanceof SQLiteKVStorage) {
+      try {
+        const stats = await storage.getStats();
+        fileSizeBytes = stats.fileSizeBytes;
+        totalKeys = stats.rowCount;
+      } catch {}
+    } else if (info.driver === 'memory') {
+      try {
+        const stats = memoryKV.getStats();
+        totalKeys = stats.keysCount;
+        fileSizeBytes = stats.estimatedBytes;
+        estimatedPayloadBytes = stats.estimatedBytes;
+      } catch {}
+    } else if (info.driver === 'cloudflare') {
+      try {
+        const listRes = await storage.list();
+        totalKeys = listRes.keys.length;
+      } catch {}
+    }
+
+    if (!totalKeys) {
+      try {
+        const listRes = await storage.list();
+        totalKeys = listRes.keys.length;
+      } catch {}
+    }
+
+    return {
+      fileSizeBytes,
+      totalKeys,
+      estimatedPayloadBytes,
+    };
+  }
+
   public reset(): void {
     if (this.storageInstance && 'close' in this.storageInstance && typeof (this.storageInstance as { close?: () => void }).close === 'function') {
       try {

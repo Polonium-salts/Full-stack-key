@@ -240,4 +240,40 @@ export class SQLiteKVStorage implements KVStorage {
   getDbPath(): string {
     return this.dbPath;
   }
+
+  async getStats(): Promise<{
+    fileSizeBytes: number;
+    rowCount: number;
+    pageCount: number;
+    pageSize: number;
+  }> {
+    const db = await this.getDb();
+    let fileSizeBytes = 0;
+    try {
+      if (typeof fs !== 'undefined' && fs.existsSync(this.dbPath)) {
+        fileSizeBytes = fs.statSync(this.dbPath).size;
+      }
+    } catch {}
+
+    let rowCount = 0;
+    let pageCount = 0;
+    let pageSize = 4096;
+
+    try {
+      const countRow = db.prepare('SELECT COUNT(*) as count FROM kv_store').get() as { count?: number | bigint } | undefined;
+      rowCount = Number(countRow?.count || 0);
+
+      const pragmaPageCount = db.prepare('PRAGMA page_count').get() as { page_count?: number | bigint } | undefined;
+      pageCount = Number(pragmaPageCount?.page_count || 0);
+
+      const pragmaPageSize = db.prepare('PRAGMA page_size').get() as { page_size?: number | bigint } | undefined;
+      pageSize = Number(pragmaPageSize?.page_size || 4096);
+
+      if (!fileSizeBytes && pageCount && pageSize) {
+        fileSizeBytes = pageCount * pageSize;
+      }
+    } catch {}
+
+    return { fileSizeBytes, rowCount, pageCount, pageSize };
+  }
 }

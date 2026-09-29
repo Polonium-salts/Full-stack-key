@@ -20,6 +20,7 @@ import {
   decryptEntry,
   exportAllData,
   importPasswords,
+  getAllPasswordEntries,
   emptyTrash,
   resetVault,
 } from '@/lib/repositories/passwordRepository';
@@ -404,4 +405,107 @@ export async function getStorageStatusAction() {
   await getServerContext();
   const { getStorageInfo } = await import('@/lib/storage');
   return getStorageInfo();
+}
+
+export interface DataMetrics {
+  storage: {
+    driver: 'sqlite' | 'cloudflare' | 'memory';
+    driverName: string;
+    configuredType: string;
+    environment: string;
+    environmentName: string;
+    isPersistent: boolean;
+    dbPath?: string;
+    bindingName?: string;
+    fallbackReason?: string;
+    description: string;
+    fileSizeBytes: number;
+    fileSizeFormatted: string;
+    totalKeys: number;
+    estimatedPayloadBytes: number;
+    estimatedPayloadFormatted: string;
+  };
+  counts: {
+    totalPasswords: number;
+    activePasswords: number;
+    trashedPasswords: number;
+    categories: number;
+    tags: number;
+    apiKeys: number;
+  };
+}
+
+export async function getDataMetricsAction(): Promise<DataMetrics> {
+  const ctx = await getServerContext();
+  const { getStorageInfo, getStorageStats } = await import('@/lib/storage');
+
+  const [info, stats, allPasswords, categories, tags, apiKeysList] = await Promise.all([
+    getStorageInfo(),
+    getStorageStats(),
+    getAllPasswordEntries(ctx.ownerId),
+    getAllCategories(ctx.ownerId),
+    getAllTags(ctx.ownerId),
+    listApiKeys(),
+  ]);
+
+  const activePasswords = allPasswords.filter((p) => !p.trashed).length;
+  const trashedPasswords = allPasswords.filter((p) => p.trashed).length;
+
+  const payloadStr = JSON.stringify({
+    passwords: allPasswords,
+    categories,
+    tags,
+  });
+  const payloadBytes = Buffer.byteLength(payloadStr, 'utf8');
+  const fileSizeBytes = stats.fileSizeBytes || payloadBytes;
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 2)} ${sizes[i]}`;
+  }
+
+  const driverNames = {
+    sqlite: 'SQLite 本地数据库',
+    cloudflare: 'Cloudflare KV 键值存储',
+    memory: 'MemoryKV 内存临时',
+  };
+
+  const envNames: Record<string, string> = {
+    node: 'Node.js 服务端',
+    cloudflare: 'Cloudflare Workers / Pages',
+    edge: 'Edge 边缘计算',
+    browser: '浏览器客户端',
+    unknown: '未知环境',
+  };
+
+  return {
+    storage: {
+      driver: info.driver,
+      driverName: driverNames[info.driver] || info.driver,
+      configuredType: info.configuredType,
+      environment: info.environment,
+      environmentName: envNames[info.environment] || info.environment,
+      isPersistent: info.isPersistent,
+      dbPath: info.details.dbPath,
+      bindingName: info.details.bindingName,
+      fallbackReason: info.details.fallbackReason,
+      description: info.details.description,
+      fileSizeBytes,
+      fileSizeFormatted: formatBytes(fileSizeBytes),
+      totalKeys: stats.totalKeys,
+      estimatedPayloadBytes: payloadBytes,
+      estimatedPayloadFormatted: formatBytes(payloadBytes),
+    },
+    counts: {
+      totalPasswords: allPasswords.length,
+      activePasswords,
+      trashedPasswords,
+      categories: categories.length,
+      tags: tags.length,
+      apiKeys: apiKeysList.length,
+    },
+  };
 }

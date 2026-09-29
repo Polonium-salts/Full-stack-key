@@ -2,7 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, KeyRound, Database, AlertTriangle, Trash2 } from 'lucide-react';
+import {
+  Download,
+  Upload,
+  KeyRound,
+  Database,
+  HardDrive,
+  Layers,
+  ShieldCheck,
+  RefreshCw,
+  Check,
+  Copy,
+  Folder,
+  Tag as TagIcon,
+  AlertTriangle,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import {
   listApiKeysAction,
@@ -12,7 +27,8 @@ import {
   changeMasterPasswordAction,
   exportDataAction,
   importDataAction,
-  getStorageStatusAction,
+  getDataMetricsAction,
+  type DataMetrics,
   emptyTrashAction,
   resetVaultAction,
 } from '@/app/actions/auth';
@@ -57,22 +73,37 @@ export default function SettingsPage() {
   const [openResetVaultDialog, setOpenResetVaultDialog] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
   const [resetVaultLoading, setResetVaultLoading] = useState(false);
-  const [storageInfo, setStorageInfo] = useState<{
-    driver: 'sqlite' | 'cloudflare' | 'memory';
-    configuredType: string;
-    environment: string;
-    isPersistent: boolean;
-    details: {
-      dbPath?: string;
-      bindingName?: string;
-      description: string;
-      fallbackReason?: string;
-    };
-  } | null>(null);
+  const [dataMetrics, setDataMetrics] = useState<DataMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [copiedPath, setCopiedPath] = useState(false);
 
   async function loadKeys() {
     const data = await listApiKeysAction();
     setApiKeys(data as ApiKeyRow[]);
+  }
+
+  async function loadMetrics(silent = false) {
+    setMetricsLoading(true);
+    try {
+      const data = await getDataMetricsAction();
+      setDataMetrics(data);
+      if (!silent) {
+        toast.success('存储统计指标已刷新');
+      }
+    } catch {
+      if (!silent) {
+        toast.error('获取存储统计失败');
+      }
+    } finally {
+      setMetricsLoading(false);
+    }
+  }
+
+  function copyDbPath(p: string) {
+    navigator.clipboard.writeText(p);
+    setCopiedPath(true);
+    toast.success('数据库路径已复制到剪贴板');
+    setTimeout(() => setCopiedPath(false), 2000);
   }
 
   useEffect(() => {
@@ -82,9 +113,9 @@ export default function SettingsPage() {
         if (!cancelled) setApiKeys(data as ApiKeyRow[]);
       })
       .catch(() => {});
-    getStorageStatusAction()
-      .then((info) => {
-        if (!cancelled) setStorageInfo(info);
+    getDataMetricsAction()
+      .then((metrics) => {
+        if (!cancelled) setDataMetrics(metrics);
       })
       .catch(() => {});
     return () => {
@@ -313,85 +344,221 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* 数据 */}
-        <TabsContent value="data" className="mt-4 space-y-4">
-          <div className="rounded-xl border bg-card p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Database className="h-5 w-5 text-primary" />
-                <div>
-                  <h2 className="font-semibold">存储引擎状态</h2>
-                  <p className="text-xs text-muted-foreground">根据当前部署环境自动适配的底层数据存储方式</p>
-                </div>
+        <TabsContent value="data" className="mt-4 space-y-5">
+          {/* 顶部标题与刷新 */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border bg-card p-5 shadow-sm">
+            <div>
+              <div className="flex items-center gap-2">
+                <Database className="size-5 text-primary" />
+                <h2 className="text-lg font-semibold tracking-tight">数据存储与资源占用</h2>
               </div>
-              {storageInfo && (
-                <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    storageInfo.isPersistent
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                  }`}
-                >
-                  {storageInfo.isPersistent ? '● 持久化存储' : '○ 内存临时存储'}
-                </span>
-              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                实时监控数据库驱动类型、物理占用空间与保险库数据体量
+              </p>
             </div>
-
-            {storageInfo ? (
-              <div className="space-y-3 pt-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg bg-muted/50 p-3">
-                    <span className="text-xs text-muted-foreground block mb-0.5">当前存储驱动</span>
-                    <span className="font-medium text-foreground">
-                      {storageInfo.driver === 'sqlite'
-                        ? 'SQLite 本地数据库'
-                        : storageInfo.driver === 'cloudflare'
-                        ? 'Cloudflare KV 分布式键值'
-                        : 'MemoryKV 内存临时'}
-                    </span>
-                  </div>
-                  <div className="rounded-lg bg-muted/50 p-3">
-                    <span className="text-xs text-muted-foreground block mb-0.5">环境检测 / 配置模式</span>
-                    <span className="font-medium text-foreground">
-                      {storageInfo.environment.toUpperCase()} / {storageInfo.configuredType}
-                    </span>
-                  </div>
-                </div>
-
-                {storageInfo.details?.dbPath && (
-                  <div className="rounded-lg bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground break-all">
-                    <span className="font-semibold text-foreground mr-1.5">SQLite 数据库路径:</span>
-                    {storageInfo.details.dbPath}
-                  </div>
-                )}
-                {storageInfo.details?.bindingName && (
-                  <div className="rounded-lg bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground mr-1.5">Cloudflare KV 绑定:</span>
-                    {storageInfo.details.bindingName}
-                  </div>
-                )}
-                {storageInfo.details?.fallbackReason && (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-50/50 p-3 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
-                    ℹ️ {storageInfo.details.fallbackReason}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Skeleton className="h-20 w-full rounded-lg" />
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={metricsLoading}
+              onClick={() => loadMetrics(false)}
+              className="gap-2 shrink-0 self-start sm:self-auto"
+            >
+              <RefreshCw className={`size-3.5 ${metricsLoading ? 'animate-spin' : ''}`} />
+              <span>刷新指标</span>
+            </Button>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          {/* 4 大核心指标卡片 */}
+          {metricsLoading && !dataMetrics ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-28 rounded-xl" />
+              ))}
+            </div>
+          ) : dataMetrics ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* 卡片 1: 数据库类型 */}
+              <div className="rounded-xl border bg-card p-4 shadow-sm space-y-2">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-xs font-medium">数据库引擎</span>
+                  <Database className="size-4 text-primary" />
+                </div>
+                <div className="text-lg font-bold tracking-tight text-foreground truncate">
+                  {dataMetrics.storage.driverName}
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-muted-foreground">{dataMetrics.storage.environmentName}</span>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      dataMetrics.storage.isPersistent
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    }`}
+                  >
+                    {dataMetrics.storage.isPersistent ? '● 持久存储' : '○ 内存临时'}
+                  </span>
+                </div>
+              </div>
+
+              {/* 卡片 2: 存储磁盘占用 */}
+              <div className="rounded-xl border bg-card p-4 shadow-sm space-y-2">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-xs font-medium">当前存储占用</span>
+                  <HardDrive className="size-4 text-blue-500" />
+                </div>
+                <div className="text-lg font-bold tracking-tight text-foreground">
+                  {dataMetrics.storage.fileSizeFormatted}
+                </div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  负载数据量约 {dataMetrics.storage.estimatedPayloadFormatted}
+                </div>
+              </div>
+
+              {/* 卡片 3: 底层键值记录数 */}
+              <div className="rounded-xl border bg-card p-4 shadow-sm space-y-2">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-xs font-medium">底层存储条目</span>
+                  <Layers className="size-4 text-emerald-500" />
+                </div>
+                <div className="text-lg font-bold tracking-tight text-foreground">
+                  {dataMetrics.storage.totalKeys} 条
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  已索引 KV 数据条目数
+                </div>
+              </div>
+
+              {/* 卡片 4: 密码库资产 */}
+              <div className="rounded-xl border bg-card p-4 shadow-sm space-y-2">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span className="text-xs font-medium">密码资产记录</span>
+                  <ShieldCheck className="size-4 text-amber-500" />
+                </div>
+                <div className="text-lg font-bold tracking-tight text-foreground">
+                  {dataMetrics.counts.totalPasswords} 组
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  正常 {dataMetrics.counts.activePasswords} · 回收站 {dataMetrics.counts.trashedPasswords}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* 详细资源与资产分布 */}
+          {dataMetrics && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* 左侧：存储驱动与环境详情 */}
+              <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <HardDrive className="size-4 text-primary" />
+                  底层存储配置明细
+                </h3>
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between rounded-lg bg-muted/40 p-2.5">
+                    <span className="text-muted-foreground">配置模式 / 运行时</span>
+                    <span className="font-mono font-medium">{dataMetrics.storage.configuredType} / {dataMetrics.storage.environment}</span>
+                  </div>
+                  {dataMetrics.storage.dbPath && (
+                    <div className="space-y-1 rounded-lg bg-muted/40 p-2.5">
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span>SQLite 本地数据库路径</span>
+                        <button
+                          type="button"
+                          onClick={() => copyDbPath(dataMetrics.storage.dbPath!)}
+                          className="flex items-center gap-1 text-[11px] text-primary hover:underline cursor-pointer"
+                        >
+                          {copiedPath ? <Check className="size-3 text-green-600" /> : <Copy className="size-3" />}
+                          {copiedPath ? '已复制' : '复制路径'}
+                        </button>
+                      </div>
+                      <div className="font-mono text-[11px] text-foreground break-all">
+                        {dataMetrics.storage.dbPath}
+                      </div>
+                    </div>
+                  )}
+                  {dataMetrics.storage.bindingName && (
+                    <div className="flex items-center justify-between rounded-lg bg-muted/40 p-2.5">
+                      <span className="text-muted-foreground">Cloudflare KV 命名空间绑定</span>
+                      <span className="font-mono font-medium">{dataMetrics.storage.bindingName}</span>
+                    </div>
+                  )}
+                  {dataMetrics.storage.fallbackReason && (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-50/50 p-2.5 text-[11px] text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                      ℹ️ {dataMetrics.storage.fallbackReason}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-muted-foreground/80 leading-relaxed pt-1">
+                    {dataMetrics.storage.description}
+                  </div>
+                </div>
+              </div>
+
+              {/* 右侧：资产构成分布 */}
+              <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Layers className="size-4 text-primary" />
+                  保险库资产构成明细
+                </h3>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between rounded-lg bg-muted/40 p-2.5">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <KeyRound className="size-3.5 text-foreground" />
+                      有效密码记录
+                    </span>
+                    <span className="font-semibold">{dataMetrics.counts.activePasswords} 条</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg bg-muted/40 p-2.5">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <Trash2 className="size-3.5 text-muted-foreground" />
+                      回收站暂存密码
+                    </span>
+                    <span className="font-semibold text-muted-foreground">{dataMetrics.counts.trashedPasswords} 条</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg bg-muted/40 p-2.5">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <Folder className="size-3.5 text-foreground" />
+                      自定义分类
+                    </span>
+                    <span className="font-semibold">{dataMetrics.counts.categories} 个</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg bg-muted/40 p-2.5">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <TagIcon className="size-3.5 text-foreground" />
+                      自定义标签
+                    </span>
+                    <span className="font-semibold">{dataMetrics.counts.tags} 个</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg bg-muted/40 p-2.5">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <ShieldCheck className="size-3.5 text-foreground" />
+                      已授权 API 密钥
+                    </span>
+                    <span className="font-semibold">{dataMetrics.counts.apiKeys} 个</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 备份与恢复 */}
+          <div className="grid gap-4 md:grid-cols-2 pt-1">
             <div className="space-y-3 rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="font-semibold">导出数据</h2>
-              <p className="text-sm text-muted-foreground">将所有密码下载为 JSON 备份文件。</p>
+              <h2 className="font-semibold flex items-center gap-2">
+                <Download className="size-4 text-primary" />
+                导出数据
+              </h2>
+              <p className="text-sm text-muted-foreground">将所有密码、分类与标签下载为 JSON 完整备份文件。</p>
               <Button onClick={handleExport} className="w-full">
                 <Download />
                 下载备份
               </Button>
             </div>
             <div className="space-y-3 rounded-xl border bg-card p-6 shadow-sm">
-              <h2 className="font-semibold">导入数据</h2>
-              <p className="text-sm text-muted-foreground">从之前导出的 JSON 文件恢复数据。</p>
+              <h2 className="font-semibold flex items-center gap-2">
+                <Upload className="size-4 text-primary" />
+                导入数据
+              </h2>
+              <p className="text-sm text-muted-foreground">从之前导出的 JSON 备份文件恢复或合并数据。</p>
               <label className="flex h-10 w-full cursor-pointer items-center justify-center rounded-lg border border-dashed border-input text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground">
                 <input type="file" accept=".json" onChange={handleImport} className="hidden" />
                 选择 JSON 文件...
