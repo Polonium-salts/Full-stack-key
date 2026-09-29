@@ -6,13 +6,12 @@ import { usePathname } from 'next/navigation';
 import {
   BookOpen,
   Folder,
+  FolderTree,
   KeyRound,
   LogOut,
   Menu,
-  Plus,
   Settings2,
   ShieldCheck,
-  Tags,
 } from 'lucide-react';
 import { logoutAction } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
@@ -23,9 +22,7 @@ import type { Category, Tag } from '@/lib/types';
 
 const navItems = [
   { href: '/dashboard', label: '全部密码', icon: KeyRound },
-  { href: '/dashboard/passwords/new', label: '新建密码', icon: Plus },
-  { href: '/dashboard/categories', label: '分类管理', icon: Folder },
-  { href: '/dashboard/tags', label: '标签管理', icon: Tags },
+  { href: '/dashboard/categories', label: '分类与标签', icon: FolderTree },
   { href: '/dashboard/settings', label: '设置', icon: Settings2 },
   { href: '/docs', label: 'API 文档', icon: BookOpen },
 ];
@@ -50,7 +47,12 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="space-y-1">
       {navItems.map(({ href, label, icon: Icon }) => {
-        const active = href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href);
+        const active =
+          href === '/dashboard'
+            ? pathname === '/dashboard'
+            : href === '/dashboard/categories'
+              ? pathname.startsWith('/dashboard/categories') || pathname.startsWith('/dashboard/tags')
+              : pathname.startsWith(href);
         return (
           <Link
             key={href}
@@ -85,7 +87,16 @@ function SidebarMetaSection({
     <>
       {categories.length > 0 && (
         <div className="mt-6">
-          <div className="mb-2 px-3 text-xs font-medium text-muted-foreground">分类</div>
+          <div className="mb-2 flex items-center justify-between px-3 text-xs font-medium text-muted-foreground">
+            <span>分类</span>
+            <Link
+              href="/dashboard/categories?tab=categories"
+              onClick={onNavigate}
+              className="text-[11px] text-muted-foreground/80 hover:text-foreground transition-colors"
+            >
+              管理
+            </Link>
+          </div>
           <div className="space-y-1">
             {categories.slice(0, 8).map((category) => (
               <Link
@@ -104,7 +115,16 @@ function SidebarMetaSection({
 
       {tags.length > 0 && (
         <div className="mt-6">
-          <div className="mb-2 px-3 text-xs font-medium text-muted-foreground">常用标签</div>
+          <div className="mb-2 flex items-center justify-between px-3 text-xs font-medium text-muted-foreground">
+            <span>常用标签</span>
+            <Link
+              href="/dashboard/categories?tab=tags"
+              onClick={onNavigate}
+              className="text-[11px] text-muted-foreground/80 hover:text-foreground transition-colors"
+            >
+              管理
+            </Link>
+          </div>
           <div className="flex flex-wrap gap-1.5 px-2">
             {tags.slice(0, 12).map((tag) => (
               <Link

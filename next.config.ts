@@ -5,6 +5,15 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  async redirects() {
+    return [
+      {
+        source: '/dashboard/passwords/new',
+        destination: '/dashboard',
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

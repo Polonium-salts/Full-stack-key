@@ -9,7 +9,6 @@ import {
   FolderOpen,
   KeyRound,
   MoreHorizontal,
-  Plus,
   RotateCcw,
   Search,
   Tag as TagIcon,
@@ -157,12 +156,6 @@ function DashboardInner() {
             />
             显示回收站
           </label>
-          <Button asChild>
-            <Link href="/dashboard/passwords/new">
-              <Plus />
-              新建密码
-            </Link>
-          </Button>
         </div>
       </div>
 
@@ -226,13 +219,14 @@ function DashboardInner() {
           </div>
           <h3 className="mb-2 text-lg font-semibold">{showTrashed ? '回收站为空' : '还没有密码'}</h3>
           <p className="mb-6 text-sm text-muted-foreground">
-            {showTrashed ? '已删除的密码会显示在这里。' : '从添加第一条密码记录开始吧。'}
+            {showTrashed
+              ? '已删除的密码会显示在这里。'
+              : '可通过浏览器扩展自动保存密码，或在设置中导入已有密码。'}
           </p>
           {!showTrashed && (
-            <Button asChild>
-              <Link href="/dashboard/passwords/new">
-                <Plus />
-                添加第一条密码
+            <Button asChild variant="outline">
+              <Link href="/dashboard/settings">
+                前往导入或配置扩展
               </Link>
             </Button>
           )}
