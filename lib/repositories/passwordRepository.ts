@@ -279,6 +279,63 @@ export async function permanentDeletePasswordEntry(ownerId: string, id: string):
   await storage.put(indexKey, newIndex);
 }
 
+export async function emptyTrash(ownerId: string): Promise<{ deletedCount: number }> {
+  const storage = getStorage();
+  const all = await getAllPasswordEntries(ownerId);
+  const trashed = all.filter((entry) => entry.trashed);
+
+  for (const entry of trashed) {
+    const key = KEY_PREFIXES.PASSWORD(ownerId, entry.id);
+    await storage.delete(key);
+  }
+
+  const indexKey = KEY_PREFIXES.PASSWORDS_INDEX(ownerId);
+  const index = (await storage.get<string[]>(indexKey)) ?? [];
+  const trashedIds = new Set(trashed.map((e) => e.id));
+  const newIndex = index.filter((id) => !trashedIds.has(id));
+  await storage.put(indexKey, newIndex);
+
+  return { deletedCount: trashed.length };
+}
+
+export async function resetVault(ownerId: string): Promise<{
+  deletedPasswords: number;
+  deletedCategories: number;
+  deletedTags: number;
+}> {
+  const storage = getStorage();
+
+  // 1. Delete all passwords
+  const pwIndexKey = KEY_PREFIXES.PASSWORDS_INDEX(ownerId);
+  const pwIndex = (await storage.get<string[]>(pwIndexKey)) ?? [];
+  for (const id of pwIndex) {
+    await storage.delete(KEY_PREFIXES.PASSWORD(ownerId, id));
+  }
+  await storage.delete(pwIndexKey);
+
+  // 2. Delete all categories
+  const catIndexKey = `pm:${ownerId}:categories:__index__`;
+  const catIndex = (await storage.get<string[]>(catIndexKey)) ?? [];
+  for (const id of catIndex) {
+    await storage.delete(`pm:${ownerId}:categories:${id}`);
+  }
+  await storage.delete(catIndexKey);
+
+  // 3. Delete all tags
+  const tagIndexKey = `pm:${ownerId}:tags:__index__`;
+  const tagIndex = (await storage.get<string[]>(tagIndexKey)) ?? [];
+  for (const id of tagIndex) {
+    await storage.delete(`pm:${ownerId}:tags:${id}`);
+  }
+  await storage.delete(tagIndexKey);
+
+  return {
+    deletedPasswords: pwIndex.length,
+    deletedCategories: catIndex.length,
+    deletedTags: tagIndex.length,
+  };
+}
+
 export async function getPasswordEntriesForSync(
   ownerId: string,
   sinceISO: string

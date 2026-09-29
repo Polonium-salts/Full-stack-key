@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, KeyRound, Database } from 'lucide-react';
+import { Download, KeyRound, Database, AlertTriangle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   listApiKeysAction,
@@ -13,6 +13,8 @@ import {
   exportDataAction,
   importDataAction,
   getStorageStatusAction,
+  emptyTrashAction,
+  resetVaultAction,
 } from '@/app/actions/auth';
 import type { ExportData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -50,6 +52,11 @@ export default function SettingsPage() {
   const [newKey, setNewKey] = useState<string | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<ApiKeyRow | null>(null);
   const [pendingRegen, setPendingRegen] = useState<ApiKeyRow | null>(null);
+  const [openEmptyTrashDialog, setOpenEmptyTrashDialog] = useState(false);
+  const [emptyTrashLoading, setEmptyTrashLoading] = useState(false);
+  const [openResetVaultDialog, setOpenResetVaultDialog] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const [resetVaultLoading, setResetVaultLoading] = useState(false);
   const [storageInfo, setStorageInfo] = useState<{
     driver: 'sqlite' | 'cloudflare' | 'memory';
     configuredType: string;
@@ -397,32 +404,160 @@ export default function SettingsPage() {
         <TabsContent value="danger" className="mt-4">
           <div className="space-y-4 rounded-xl border border-destructive/40 bg-card p-6 shadow-sm">
             <div>
-              <h2 className="font-semibold text-destructive">危险操作</h2>
+              <h2 className="flex items-center gap-2 font-semibold text-destructive">
+                <AlertTriangle className="size-5" />
+                危险操作
+              </h2>
               <p className="mt-1 text-sm text-muted-foreground">以下操作不可撤销，请谨慎操作。</p>
             </div>
-            <div className="space-y-3 border-t pt-4">
-              <div className="flex items-center justify-between">
+            <div className="space-y-4 border-t pt-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="font-medium">清空回收站</div>
                   <div className="text-xs text-muted-foreground">永久删除所有已回收的密码</div>
                 </div>
-                <Button variant="outline" disabled className="text-destructive">
-                  即将上线
+                <Button
+                  variant="outline"
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto w-full"
+                  onClick={() => setOpenEmptyTrashDialog(true)}
+                >
+                  <Trash2 className="size-4" />
+                  清空回收站
                 </Button>
               </div>
-              <div className="flex items-center justify-between">
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between pt-3 border-t">
                 <div>
                   <div className="font-medium">重置整个保险库</div>
-                  <div className="text-xs text-muted-foreground">删除所有密码、分类和标签</div>
+                  <div className="text-xs text-muted-foreground">删除所有密码、分类和标签，保留主密码与 API 密钥</div>
                 </div>
-                <Button variant="outline" disabled className="text-destructive">
-                  即将上线
+                <Button
+                  variant="outline"
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto w-full"
+                  onClick={() => {
+                    setResetConfirmText('');
+                    setOpenResetVaultDialog(true);
+                  }}
+                >
+                  <AlertTriangle className="size-4" />
+                  重置保险库
                 </Button>
               </div>
             </div>
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* 清空回收站确认 */}
+      <AlertDialog open={openEmptyTrashDialog} onOpenChange={setOpenEmptyTrashDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="size-5" />
+              清空回收站？
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作将永久删除所有已在回收站中的密码，删除后无法找回或恢复。确定要继续清空吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={emptyTrashLoading}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={emptyTrashLoading}
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={async (e) => {
+                e.preventDefault();
+                setEmptyTrashLoading(true);
+                try {
+                  const res = await emptyTrashAction();
+                  if (res.deletedCount === 0) {
+                    toast.info('回收站目前为空，无需清理');
+                  } else {
+                    toast.success(`已清空回收站，永久删除了 ${res.deletedCount} 条记录`);
+                  }
+                  setOpenEmptyTrashDialog(false);
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : '清空回收站失败');
+                } finally {
+                  setEmptyTrashLoading(false);
+                }
+              }}
+            >
+              {emptyTrashLoading ? '正在清空...' : '确定清空'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 重置整个保险库确认 */}
+      <AlertDialog
+        open={openResetVaultDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setResetConfirmText('');
+            setOpenResetVaultDialog(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="size-5" />
+              危险：确认重置整个保险库？
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  此操作将<strong className="text-foreground">永久删除保险库中所有的密码记录（包括回收站）、全部自定义分类与标签</strong>。
+                </p>
+                <p className="text-xs">
+                  注意：您的主登录密码和 API 密钥仍将保留，操作完成后保险库将完全恢复为空白状态。
+                </p>
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                  为防止误触，请在下方输入 <span className="font-bold underline">重置</span> 或{' '}
+                  <span className="font-bold underline font-mono">RESET</span> 以确认执行：
+                </div>
+                <Input
+                  value={resetConfirmText}
+                  onChange={(e) => setResetConfirmText(e.target.value)}
+                  placeholder="输入 重置 或 RESET"
+                  className="font-mono text-sm"
+                  autoFocus
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetVaultLoading}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={
+                resetVaultLoading ||
+                (resetConfirmText.trim() !== '重置' && resetConfirmText.trim().toUpperCase() !== 'RESET')
+              }
+              className="bg-destructive text-white hover:bg-destructive/90 disabled:opacity-50"
+              onClick={async (e) => {
+                e.preventDefault();
+                setResetVaultLoading(true);
+                try {
+                  const res = await resetVaultAction();
+                  toast.success(
+                    `保险库已重置：已清空 ${res.deletedPasswords} 条密码、${res.deletedCategories} 个分类、${res.deletedTags} 个标签`
+                  );
+                  setOpenResetVaultDialog(false);
+                  setResetConfirmText('');
+                  router.refresh();
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : '重置保险库失败');
+                } finally {
+                  setResetVaultLoading(false);
+                }
+              }}
+            >
+              {resetVaultLoading ? '正在重置...' : '确认重置保险库'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* 吊销确认 */}
       <AlertDialog open={!!pendingRevoke} onOpenChange={(open) => !open && setPendingRevoke(null)}>

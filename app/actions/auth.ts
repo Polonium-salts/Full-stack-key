@@ -20,6 +20,8 @@ import {
   decryptEntry,
   exportAllData,
   importPasswords,
+  emptyTrash,
+  resetVault,
 } from '@/lib/repositories/passwordRepository';
 import {
   getAllCategories,
@@ -266,6 +268,18 @@ export async function restorePasswordAction(id: string) {
   const ctx = await getServerContext();
   await restorePasswordEntry(ctx.ownerId, id);
   return { ok: true };
+}
+
+export async function emptyTrashAction() {
+  const ctx = await getServerContext();
+  const res = await emptyTrash(ctx.ownerId);
+  return { ok: true, deletedCount: res.deletedCount };
+}
+
+export async function resetVaultAction() {
+  const ctx = await getServerContext();
+  const res = await resetVault(ctx.ownerId);
+  return { ok: true, ...res };
 }
 
 export async function listCategoriesAction() {
